@@ -28,3 +28,4 @@ test.py
 # Local scripts and sample exports
 scripts/
 synohub_full_sample_schema_and_data.sql
+passwords.me
