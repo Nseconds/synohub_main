@@ -468,6 +468,22 @@ export async function handleAIRecordSave(reply: string, userRole: string = "gues
       const ticketId = record.ticketId || (`TKT-${crypto.randomBytes(4).toString("hex").toUpperCase()}`);
       const mapped = mapInputToSchema(record);
       normalizeMappedContactAndCustomer(mapped);
+      
+      // Verify if customer exists in the database
+      if (mapped.customerName) {
+        const [existingCustomer] = await db
+          .select({ id: customers.id })
+          .from(customers)
+          .where(eq(customers.name, mapped.customerName.trim()))
+          .limit(1);
+
+        if (!existingCustomer) {
+          return {
+            reply: "this user is not exist in db",
+          };
+        }
+      }
+
       const requestedPerson = applyRequiredRequestedPerson(mapped, userRole, userName);
       if (!requestedPerson) {
         return {
