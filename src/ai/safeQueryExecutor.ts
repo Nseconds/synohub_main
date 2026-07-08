@@ -1,4 +1,5 @@
 import queryRegistry, { applyRoleScope } from "./queryRegistry";
+import * as customerRegistry from "./customerQueryRegistry";
 import type { AuthUser } from "../auth/users";
 import {
   providerToDetected,
@@ -25,9 +26,9 @@ export const safeQueryHandlers: Record<SafeQueryIntent, (params: any) => Promise
   createServiceRequest: classifyActionIntentOnly,
   createMigrationTicket: classifyActionIntentOnly,
   createInstallationTicket: classifyActionIntentOnly,
-  findCustomerByName: queryRegistry.findCustomerByName,
-  findCustomerByPhone: queryRegistry.findCustomerByPhone,
-  findCustomerByEmail: queryRegistry.findCustomerByEmail,
+  findCustomerByName: customerRegistry.findCustomerByName,
+  findCustomerByPhone: customerRegistry.findCustomerByPhone,
+  findCustomerByEmail: customerRegistry.findCustomerByEmail,
   getPendingTicketsByStaff: queryRegistry.getPendingTicketsByStaff,
   getOpenTicketsByRegion: queryRegistry.getOpenTicketsByRegion,
   getTicketsByStaff: queryRegistry.getTicketsByStaff,
@@ -47,8 +48,8 @@ export const safeQueryHandlers: Record<SafeQueryIntent, (params: any) => Promise
   getMostCommonIssues: queryRegistry.getMostCommonIssues,
   getCustomerWithMostRequests: queryRegistry.getCustomerWithMostRequests,
   getCustomerHistory: queryRegistry.getCustomerHistory,
-  getCustomerFleetSize: queryRegistry.getCustomerFleetSize,
-  getCustomerRegion: queryRegistry.getCustomerRegion,
+  getCustomerFleetSize: customerRegistry.getCustomerFleetSize,
+  getCustomerRegion: customerRegistry.getCustomerRegion,
   getTechnicianWorkload: queryRegistry.getTechnicianWorkload,
   getHighestWorkload: queryRegistry.getHighestWorkload,
   getLowestWorkload: queryRegistry.getLowestWorkload,
