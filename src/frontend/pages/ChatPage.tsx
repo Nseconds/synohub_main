@@ -110,24 +110,7 @@ export const ChatPage = ({
                 Gemini
               </span>
             </div>
-            {currentUser.role === "admin" && (
-              <div className="flex items-center gap-2">
-                <span className="text-zinc-500 font-medium">Chat as:</span>
-                <select
-                  value={selectedChatTarget}
-                  onChange={(e) => onChatTargetChange(e.target.value)}
-                  className="bg-white border border-zinc-200 rounded px-2 py-1 text-xs text-zinc-800 focus:outline-none focus:border-teal-accent font-medium cursor-pointer"
-                >
-                  <option value="admin">Admin</option>
-                  <option value="guest">Guest</option>
-                  {staffOptions.map((p) => (
-                    <option key={p} value={`staff:${p}`}>
-                      Staff: {p}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+
           </div>
         </div>
       )}

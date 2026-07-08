@@ -218,9 +218,6 @@ export async function startServer() {
 
       const providers: Record<QueryProviderName, QueryProviderResult> = {
         gemini: { durationMs: 0, error: "Not run for this mode." },
-        local: { durationMs: 0, error: "Not run for this mode." },
-        nvidia: { durationMs: 0, error: "Not run for this mode." },
-        openrouter: { durationMs: 0, error: "Not run for this mode." },
       };
 
       providers.gemini = await runGeminiIntentProvider(message);
@@ -276,7 +273,7 @@ export async function startServer() {
       const authUser = getAuthUser(req);
       const aiMode = normalizeQueryAiMode(req.body?.aiMode, authUser);
       const compareProviders = normalizeCompareProviders(req.body?.compareProviders);
-      const chatProviderMode = aiMode === "compare" ? compareProviders[0] : aiMode;
+      const chatProviderMode = aiMode;
       const chatIdentity = resolveChatIdentity(authUser, selectedChatTarget || selectedUsername);
       let userRole = chatIdentity.role;
       let userName = chatIdentity.name;
@@ -472,55 +469,9 @@ export async function startServer() {
         }
       }
 
-      // Fetch live DB Context dynamically filtered by user authorization limits
-      let fetchedCustomers: any[] = [];
-      let fetchedRequests: any[] = [];
-
-      if (userRole === "admin") {
-        fetchedCustomers = await db.select().from(customers).orderBy(desc(customers.id)).limit(40);
-        fetchedRequests = await db.select().from(serviceRequests).orderBy(desc(serviceRequests.id)).limit(40);
-      } else if (userRole === "staff" && userName) {
-        // Fetch up to 1000 service requests first to filter
-        const rawRequests = await db.select().from(serviceRequests)
-          .orderBy(desc(serviceRequests.id))
-          .limit(1000);
-
-        const lowerUser = userName.toLowerCase().trim();
-        fetchedRequests = rawRequests.filter(r => {
-          const salesPerson = (r.salesPerson || "").trim().toLowerCase();
-          const reqPerson = (r.requestedPerson || "").trim().toLowerCase();
-          const createdByVal = (r.createdBy || "").trim().toLowerCase();
-          return salesPerson === lowerUser || reqPerson === lowerUser || createdByVal === lowerUser;
-        }).slice(0, 60);
-
-        // Collect allowed customer name set
-        const allowedCustomerNames = new Set(
-          fetchedRequests.map(r => (r.customerName || "").trim().toLowerCase())
-        );
-
-        // Fetch/filter customers only where customer.name matches or customer.createdBy matches logged-in user
-        const rawCustomers = await db.select().from(customers).orderBy(desc(customers.id)).limit(1000);
-        fetchedCustomers = rawCustomers.filter(c => {
-          const cName = (c.name || "").trim().toLowerCase();
-          const cCreatedBy = (c.createdBy || "").trim().toLowerCase();
-          return allowedCustomerNames.has(cName) || cCreatedBy === lowerUser;
-        });
-      } else if (userRole === "guest" && userName) {
-        // Guest can retrieve ONLY records they created themselves
-        const lowerUser = userName.toLowerCase().trim();
-        fetchedCustomers = await db.select().from(customers)
-          .where(eq(customers.createdBy, lowerUser))
-          .orderBy(desc(customers.id))
-          .limit(40);
-          
-        fetchedRequests = await db.select().from(serviceRequests)
-          .where(eq(serviceRequests.createdBy, lowerUser))
-          .orderBy(desc(serviceRequests.id))
-          .limit(40);
-      } else {
-        fetchedCustomers = [];
-        fetchedRequests = [];
-      }
+      // Fetch live DB Context (unified access, no scoping)
+      const fetchedCustomers = await db.select().from(customers).orderBy(desc(customers.id)).limit(40);
+      const fetchedRequests = await db.select().from(serviceRequests).orderBy(desc(serviceRequests.id)).limit(40);
 
       // Extract unique alphanumeric keywords from the message to also search older records dynamically
       const keywords = message.toLowerCase()
@@ -528,7 +479,7 @@ export async function startServer() {
         .split(/\s+/)
         .filter((w: string) => w.length >= 4 && !["what", "show", "list", "with", "this", "that", "please", "lead", "ticket", "status", "save", "update", "customer", "service", "active", "queue", "info", "record", "from"].includes(w));
 
-      if (keywords.length > 0 && userRole !== "guest") {
+      if (keywords.length > 0) {
         try {
           // Perform targeted searches to pull in older records if they are explicitly mentioned
           for (const word of keywords) {
@@ -537,51 +488,17 @@ export async function startServer() {
               like(customers.contactName, `%${word}%`)
             ));
             for (const c of extraCustomers) {
-              if (userRole === "admin") {
-                if (!fetchedCustomers.some(fc => fc.id === c.id)) {
-                  fetchedCustomers.push(c);
-                }
-              } else if (userRole === "staff" && userName) {
-                // Any extra customer found by keyword must still be allowed only if:
-                // its name is in the staff user's allowed customer name set OR
-                // customer.createdBy matches the logged-in user.
-                const lowerUser = userName.toLowerCase().trim();
-                const cName = (c.name || "").trim().toLowerCase();
-                const cCreatedBy = (c.createdBy || "").trim().toLowerCase();
-                const allowedCustomerNames = new Set(
-                  fetchedRequests.map(r => (r.customerName || "").trim().toLowerCase())
-                );
-                if (allowedCustomerNames.has(cName) || cCreatedBy === lowerUser) {
-                  if (!fetchedCustomers.some(fc => fc.id === c.id)) {
-                    fetchedCustomers.push(c);
-                  }
-                }
+              if (!fetchedCustomers.some(fc => fc.id === c.id)) {
+                fetchedCustomers.push(c);
               }
             }
 
-            let extraRequests: any[] = [];
-            if (userRole === "admin") {
-              extraRequests = await db.select().from(serviceRequests).where(or(
-                like(serviceRequests.customerName, `%${word}%`),
-                like(serviceRequests.contactName, `%${word}%`),
-                like(serviceRequests.issueDescription, `%${word}%`),
-                like(serviceRequests.comment, `%${word}%`)
-              ));
-            } else if (userRole === "staff" && userName) {
-              const rawExtra = await db.select().from(serviceRequests).where(or(
-                like(serviceRequests.customerName, `%${word}%`),
-                like(serviceRequests.contactName, `%${word}%`),
-                like(serviceRequests.issueDescription, `%${word}%`),
-                like(serviceRequests.comment, `%${word}%`)
-              )).limit(500);
-              const lowerUser = userName.toLowerCase().trim();
-              extraRequests = rawExtra.filter(r => {
-                const salesPerson = (r.salesPerson || "").trim().toLowerCase();
-                const reqPerson = (r.requestedPerson || "").trim().toLowerCase();
-                const createdByVal = (r.createdBy || "").trim().toLowerCase();
-                return salesPerson === lowerUser || reqPerson === lowerUser || createdByVal === lowerUser;
-              });
-            }
+            const extraRequests = await db.select().from(serviceRequests).where(or(
+              like(serviceRequests.customerName, `%${word}%`),
+              like(serviceRequests.contactName, `%${word}%`),
+              like(serviceRequests.issueDescription, `%${word}%`),
+              like(serviceRequests.comment, `%${word}%`)
+            ));
 
             for (const r of extraRequests) {
               if (!fetchedRequests.some(fr => fr.id === r.id)) {

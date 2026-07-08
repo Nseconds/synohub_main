@@ -10,7 +10,7 @@ function normalizeBcryptHash(hash: string) {
 }
 
 function roleFromUserType(userType: string) {
-  return userType.trim().toLowerCase() === "admin" ? "admin" as const : "staff" as const;
+  return "admin" as const;
 }
 
 export function registerAuthRoutes(app: Express) {
@@ -48,9 +48,5 @@ export function registerAuthRoutes(app: Express) {
       console.error("Login failed:", error);
       return res.status(500).json({ error: "Login failed. Please try again." });
     }
-  });
-
-  app.post("/api/guest-session", (_req, res) => {
-    res.status(403).json({ error: "Guest access is disabled. Please sign in with an active user account." });
   });
 }

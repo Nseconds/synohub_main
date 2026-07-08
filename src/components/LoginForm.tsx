@@ -4,10 +4,9 @@ import { login } from "../frontend/api/authApi";
 
 interface LoginFormProps {
   onLoginSuccess: (user: { name: string; role: string; token: string }) => void;
-  onProceedAsGuest: () => void | Promise<void>;
 }
 
-export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess, onProceedAsGuest }) => {
+export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -34,19 +33,6 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess, onProceedA
     } catch (err: any) {
       console.error("Login failed:", err);
       setError(err.response?.data?.error || "Incorrect username or password. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGuest = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      await onProceedAsGuest();
-    } catch (err: any) {
-      console.error("Guest session failed:", err);
-      setError(err.response?.data?.error || "Could not start a guest session. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -139,29 +125,13 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess, onProceedA
             </button>
           </form>
 
-          {/* Proceed as guest */}
-          <div className="relative my-6 flex items-center justify-center">
-            <div className="absolute inset-x-0 h-px bg-zinc-200/60" />
-            <span className="relative bg-white px-3 text-[10px] text-zinc-400 font-bold uppercase tracking-widest">Public Client Access</span>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleGuest}
-            disabled={loading}
-            className="w-full border border-zinc-200 hover:bg-zinc-50 text-zinc-600 rounded-xl py-3 text-xs font-bold transition-all flex items-center justify-center gap-2"
-            id="login_guest_btn"
-          >
-            🚀 Submit Task / Request as Guest
-          </button>
-
           {/* Login guidance */}
           <div className="mt-8 pt-6 border-t border-zinc-100">
-            <div className="mt-5 p-3.5 bg-zinc-50 rounded-xl border border-zinc-150 text-[11px] text-zinc-600 space-y-2">
+            <div className="mt-5 p-3.5 bg-zinc-50 rounded-xl border border-zinc-200 text-[11px] text-zinc-600 space-y-2">
               <span className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Secure Access</span>
               <div className="space-y-1.5">
                 <p className="leading-relaxed">
-                  Staff and administrator passwords are managed on the server. Guests receive an isolated temporary session for their own requests.
+                  User accounts and passwords are managed on the secure database. Only registered database users have access to portal systems.
                 </p>
               </div>
             </div>

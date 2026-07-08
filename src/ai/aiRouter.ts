@@ -1,20 +1,20 @@
 import type { SafeQueryAiMode } from "./chatService";
 
-export type QueryProviderName = "gemini" | "local" | "nvidia" | "openrouter";
-export type PublicAiProviderMode = "gemini" | "local" | "gpt-oss" | "cohere" | "compare" | "auto-fallback";
+export type QueryProviderName = "gemini";
+export type PublicAiProviderMode = "gemini";
 
-export function normalizeQueryAiMode(value: unknown, _authUser?: unknown): SafeQueryAiMode {
+export function normalizeQueryAiMode(value: unknown, _authUser?: unknown): "gemini" {
   return "gemini";
 }
 
-export function normalizeProviderName(value: unknown): QueryProviderName | null {
+export function normalizeProviderName(value: unknown): "gemini" {
   return "gemini";
 }
 
-export function normalizeCompareProviders(value: unknown): QueryProviderName[] {
+export function normalizeCompareProviders(value: unknown): "gemini"[] {
   return ["gemini"];
 }
 
-export function normalizeAiProviderMode(value: unknown): PublicAiProviderMode {
+export function normalizeAiProviderMode(value: unknown): "gemini" {
   return "gemini";
 }

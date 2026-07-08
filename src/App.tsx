@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { LayoutDashboard, Plus, Sparkles, ClipboardList } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { createGuestSession } from "./frontend/api/authApi";
 import { updateCustomer } from "./frontend/api/customerApi";
 import { fetchDashboardData } from "./frontend/api/dashboardApi";
 import { createLead, updateLead, updateServiceRequest } from "./frontend/api/serviceRequestApi";
@@ -12,7 +11,6 @@ import { Header } from "./frontend/components/Header";
 import { Modal } from "./frontend/components/Modal";
 import { NotificationToast } from "./frontend/components/NotificationToast";
 import { Sidebar } from "./frontend/components/Sidebar";
-import { StaffRegistrationModal } from "./frontend/components/StaffRegistrationModal";
 import { IMPLEMENTATION_TYPES, LEAD_STATUSES, PAYMENT_OPTIONS, REGIONS, REQUESTED_PEOPLE, SALES_PEOPLE, SALES_TYPES, SOURCES, TICKET_STATUSES } from "./frontend/constants/options";
 import { AiPage } from "./frontend/pages/AiPage";
 import { DashboardPage } from "./frontend/pages/DashboardPage";
@@ -21,9 +19,10 @@ import { LoginPage } from "./frontend/pages/LoginPage";
 import type { Customer, Registration, ServiceTicket } from "./frontend/types";
 import { isValidStoredUser } from "./frontend/utils/auth";
 
-function findOptionMatch(value: string | undefined, list: string[], defaultValue?: string): string {
-  if (!value) return defaultValue !== undefined ? defaultValue : list[0];
-  const cleanedVal = value.trim().toUpperCase().replace(/\s*\+\s*/g, "+").replace(/\s+/g, "");
+function findOptionMatch(value: any, list: string[], defaultValue?: string): string {
+  if (value === undefined || value === null || value === "") return defaultValue !== undefined ? defaultValue : list[0];
+  const stringValue = String(value);
+  const cleanedVal = stringValue.trim().toUpperCase().replace(/\s*\+\s*/g, "+").replace(/\s+/g, "");
   const normalize = (option: string) => option.trim().toUpperCase().replace(/\s*\+\s*/g, "+").replace(/\s+/g, "");
   const exact = list.find(opt => normalize(opt) === cleanedVal);
   if (exact) return exact;
@@ -54,18 +53,7 @@ export default function App() {
     return null;
   });
 
-  const [activeTab, setActiveTab ] = useState<string>(() => {
-    try {
-      const saved = localStorage.getItem("synohub-user");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (isValidStoredUser(parsed) && parsed.role !== "guest") {
-          return "overview";
-        }
-      }
-    } catch (e) {}
-    return "new-form";
-  });
+  const [activeTab, setActiveTab ] = useState<string>("overview");
 
   const [requestedPeopleList, setRequestedPeopleList] = useState<string[]>(REQUESTED_PEOPLE);
   const [defaultRequestedPerson, setDefaultRequestedPerson] = useState<string>("");
@@ -314,15 +302,17 @@ export default function App() {
       const dbRequestedPeople = new Set<string>();
       if (res?.registrations && Array.isArray(res.registrations)) {
         res.registrations.forEach((r: any) => {
-          if (r?.requestedPerson && r.requestedPerson.trim()) {
-            dbRequestedPeople.add(r.requestedPerson.trim());
+          if (r?.requestedPerson) {
+            const trimmed = String(r.requestedPerson).trim();
+            if (trimmed) dbRequestedPeople.add(trimmed);
           }
         });
       }
       if (res?.services && Array.isArray(res.services)) {
         res.services.forEach((s: any) => {
-          if (s?.requestedPerson && s.requestedPerson.trim()) {
-            dbRequestedPeople.add(s.requestedPerson.trim());
+          if (s?.requestedPerson) {
+            const trimmed = String(s.requestedPerson).trim();
+            if (trimmed) dbRequestedPeople.add(trimmed);
           }
         });
       }
@@ -385,16 +375,9 @@ export default function App() {
 
   const navItems = [
     { id: "overview", label: "Dashboard", icon: LayoutDashboard },
-    { id: "new-form", label: "New Form", icon: Plus },
     { id: "existing-form", label: "Existing Form", icon: ClipboardList },
     { id: "ai", label: "SynoAI Chat", icon: Sparkles },
-  ].filter(item => {
-    if (!user) return false;
-    if (user.role === "guest") {
-      return item.id === "new-form" || item.id === "existing-form" || item.id === "ai";
-    }
-    return true;
-  });
+  ].filter(item => !!user);
 
   if (!user) {
     return (
@@ -402,21 +385,9 @@ export default function App() {
         onLoginSuccess={(loggedUser) => {
           localStorage.setItem("synohub-user", JSON.stringify(loggedUser));
           setUser(loggedUser);
-          if (loggedUser.role === "guest") {
-            setActiveTab("new-form");
-          } else {
-            setActiveTab("overview");
-          }
+          setActiveTab("overview");
           showToast(`Welcome back, ${loggedUser.name}!`);
         }} 
-        onProceedAsGuest={async () => {
-          const res: any = await createGuestSession();
-          const guestUser = { name: res.name, role: res.role, token: res.token };
-          localStorage.setItem("synohub-user", JSON.stringify(guestUser));
-          setUser(guestUser);
-          setActiveTab("new-form");
-          showToast("Accessing as Public Guest. Data retrieval is secured.");
-        }}
       />
     );
   }
@@ -436,22 +407,9 @@ export default function App() {
     window.location.reload();
   };
 
-  const handleProceedAsGuestRecovery = async () => {
-    try {
-      const res: any = await createGuestSession();
-      const guestUser = { name: res.name, role: res.role, token: res.token };
-      localStorage.setItem("synohub-user", JSON.stringify(guestUser));
-      setUser(guestUser);
-      window.location.reload();
-    } catch (e) {
-      console.error("Guest recovery failed", e);
-    }
-  };
-
   const errorFallback = (
     <LoginPage
       onLoginSuccess={handleLoginSuccessRecovery}
-      onProceedAsGuest={handleProceedAsGuestRecovery}
     />
   );
 
@@ -619,35 +577,6 @@ export default function App() {
                </form>
             </Modal>
 
-            {activeTab === "new-form" && (
-              <LeadFormPage
-                mode="new"
-                leadForm={leadForm}
-                setLeadForm={setLeadForm}
-                onSubmit={handleLeadSubmit}
-                onResetLeadForm={resetLeadForm}
-                onCloseExisting={() => setActiveTab("new-form")}
-                searchTerm={searchTerm}
-                filteredCustomers={filteredCustomers}
-                registrations={data?.registrations || []}
-                customers={data?.customers || []}
-                onSelectCustomer={handleSelectCustomer}
-                showSuggestions={showSuggestions}
-                setShowSuggestions={setShowSuggestions}
-                showExistingSuggestions={showExistingSuggestions}
-                setShowExistingSuggestions={setShowExistingSuggestions}
-                selectedLeadId={selectedLeadId}
-                user={user}
-                sources={SOURCES}
-                regions={REGIONS}
-                leadStatuses={LEAD_STATUSES}
-                implementationTypes={IMPLEMENTATION_TYPES}
-                salesPeople={SALES_PEOPLE}
-                salesTypes={SALES_TYPES}
-                requestedPeopleList={requestedPeopleList}
-              />
-            )}
-
             {activeTab === "overview" && (
               <DashboardPage
                 registrations={data.registrations || []}
@@ -676,7 +605,7 @@ export default function App() {
                 setLeadForm={setLeadForm}
                 onSubmit={handleLeadSubmit}
                 onResetLeadForm={resetLeadForm}
-                onCloseExisting={() => setActiveTab("new-form")}
+                onCloseExisting={() => setActiveTab("overview")}
                 searchTerm={searchTerm}
                 filteredCustomers={filteredCustomers}
                 registrations={data?.registrations || []}
@@ -784,37 +713,7 @@ export default function App() {
         />
       )}
 
-      {/* Dynamic Staff Registration Confirmation Modal */}
-      {pendingStaffName && (
-        <StaffRegistrationModal
-          name={pendingStaffName}
-          onCancel={() => {
-            const name = pendingStaffName;
-            setPendingStaffName(null);
-            showToast(`Registration cancelled for "${name}".`, "error");
-          }}
-          onConfirm={() => {
-            const name = pendingStaffName;
-            setPendingStaffName(null);
-            
-            // Dynamically register in list
-            setRequestedPeopleList(prev => {
-              if (!prev.some(p => p.toLowerCase() === name.toLowerCase())) {
-                return [...prev, name];
-              }
-              return prev;
-            });
 
-            // Defaults subsequent lead registrations or service tickets to them as the Requested Person
-            setDefaultRequestedPerson(name);
-            
-            // Pre-populate actual forms
-            setLeadForm(prev => ({ ...prev, requestedPerson: name }));
-
-            showToast(`"${name}" is now dynamically registered and set as your session default coordinator!`, "success");
-          }}
-        />
-      )}
 
   </AppBoundary>
   );

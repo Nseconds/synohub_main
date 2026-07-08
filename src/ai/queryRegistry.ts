@@ -133,108 +133,21 @@ function getQueryUser(user?: SafeQueryUser): Required<SafeQueryUser> | null {
 }
 
 export function applyRoleScope(user?: SafeQueryUser): RoleScope {
-  const queryUser = getQueryUser(user);
-
-  if (!queryUser) {
-    return { sql: "AND 1 = 0", params: [] };
-  }
-
-  if (queryUser.role === "admin") {
-    return { sql: "", params: [] };
-  }
-
-  const normalizedName = normalizeName(queryUser.name);
-
-  if (queryUser.role === "staff") {
-    return {
-      sql: `
-        AND (
-          LOWER(COALESCE(requested_person, '')) = ?
-          OR LOWER(COALESCE(sales_person, '')) = ?
-          OR LOWER(COALESCE(created_by, '')) = ?
-        )
-      `,
-      params: [normalizedName, normalizedName, normalizedName],
-    };
-  }
-
-  return {
-    sql: "AND LOWER(COALESCE(created_by, '')) = ?",
-    params: [normalizedName],
-  };
+  return { sql: "", params: [] };
 }
 
 export function applyCustomerRoleScope(user?: SafeQueryUser): RoleScope {
-  const queryUser = getQueryUser(user);
-
-  if (!queryUser) {
-    return { sql: "AND 1 = 0", params: [] };
-  }
-
-  if (queryUser.role === "admin") {
-    return { sql: "", params: [] };
-  }
-
-  const normalizedName = normalizeName(queryUser.name);
-
-  if (queryUser.role === "staff") {
-    return {
-      sql: `
-        AND (
-          LOWER(COALESCE(c.created_by, '')) = ?
-          OR EXISTS (
-            SELECT 1
-            FROM service_requests sr_scope
-            WHERE LOWER(COALESCE(sr_scope.customer_name, '')) = LOWER(COALESCE(c.name, ''))
-              AND (
-                LOWER(COALESCE(sr_scope.requested_person, '')) = ?
-                OR LOWER(COALESCE(sr_scope.sales_person, '')) = ?
-                OR LOWER(COALESCE(sr_scope.created_by, '')) = ?
-              )
-          )
-        )
-      `,
-      params: [normalizedName, normalizedName, normalizedName, normalizedName],
-    };
-  }
-
-  return {
-    sql: "AND LOWER(COALESCE(c.created_by, '')) = ?",
-    params: [normalizedName],
-  };
+  return { sql: "", params: [] };
 }
 
 export function applyChatRoleScope(user?: SafeQueryUser, channelName?: string): RoleScope {
-  const queryUser = getQueryUser(user);
-
-  if (!queryUser) {
-    return { sql: "AND 1 = 0", params: [] };
-  }
-
   const requestedChannel = String(channelName || "").trim();
-
-  if (queryUser.role === "admin") {
-    if (!requestedChannel) {
-      return { sql: "", params: [] };
-    }
-    return {
-      sql: "AND username = ?",
-      params: [requestedChannel],
-    };
+  if (!requestedChannel) {
+    return { sql: "", params: [] };
   }
-
-  if (queryUser.role === "staff") {
-    const staffChannel = `staff:${queryUser.name.trim()}`;
-    return {
-      sql: "AND (username = ? OR username = ?)",
-      params: [staffChannel, queryUser.name.trim()],
-    };
-  }
-
-  const guestChannel = `guest:${normalizeName(queryUser.name)}`;
   return {
     sql: "AND username = ?",
-    params: [guestChannel],
+    params: [requestedChannel],
   };
 }
 
