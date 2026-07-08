@@ -1,5 +1,3 @@
-import type { SafeQueryAiMode } from "./chatService";
-
 export type QueryProviderName = "gemini";
 export type PublicAiProviderMode = "gemini";
 

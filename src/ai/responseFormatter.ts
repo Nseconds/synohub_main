@@ -1,4 +1,4 @@
-import type { SafeQueryAiMode } from "./chatService";
+export type SafeQueryAiMode = "gemini";
 
 export function getModeScopedChatChannel(channel: string, aiMode: SafeQueryAiMode): string {
   return `${channel}|ai:${aiMode}`;

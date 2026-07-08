@@ -59,10 +59,8 @@ import {
   formatCompareChatReply,
   getModeScopedChatChannel,
   sanitizeProviderChatHistory,
-} from "../ai/responseFormatter";
-import {
   type SafeQueryAiMode,
-} from "../ai/chatService";
+} from "../ai/responseFormatter";
 import { registerAnalyticsRoutes } from "./analyticsRoutes";
 import { registerAuthRoutes } from "./authRoutes";
 import { registerCustomerRoutes } from "./customerRoutes";
