@@ -5,7 +5,7 @@ import {
   geminiModel,
   genAI,
 } from "../ai/providerConfig";
-import { loadPrompts } from "../ai/prompts/promptLoader";
+import { loadPrompts } from "../ai";
 
 const prompts = loadPrompts();
 

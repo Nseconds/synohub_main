@@ -23,8 +23,7 @@ import { answerRequestedPersonLookup } from "../ai/directLookupAnswers";
 import {
   isAcknowledgementOnlyMessage,
 } from "../ai/recordSaveHandler";
-import { buildChatSystemInstruction } from "../ai/prompts/buildPrompt";
-import { loadPrompts } from "../ai/prompts/promptLoader";
+import { buildChatSystemInstruction, loadPrompts } from "../ai";
 import {
   normalizeCompareProviders,
   normalizeQueryAiMode,

@@ -1,1 +1,2 @@
-export * from "./prompts/promptLoader";
+export * from "./promptLoader";
+export * from "./buildPrompt";
