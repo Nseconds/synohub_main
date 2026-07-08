@@ -1,6 +1,4 @@
 import queryRegistry, { applyRoleScope } from "./queryRegistry";
-import * as customerRegistry from "./customerQueryRegistry";
-import * as exceptionalRegistry from "./exceptionalQueryRegistry";
 import type { AuthUser } from "../auth/users";
 import {
   providerToDetected,
@@ -17,6 +15,10 @@ async function classifyActionIntentOnly(): Promise<any[]> {
   return [];
 }
 
+async function disabledLookupHandler(): Promise<any[]> {
+  return [];
+}
+
 export const safeQueryHandlers: Record<SafeQueryIntent, (params: any) => Promise<any[]>> = {
   assignTicket: classifyActionIntentOnly,
   reassignTicket: classifyActionIntentOnly,
@@ -27,43 +29,43 @@ export const safeQueryHandlers: Record<SafeQueryIntent, (params: any) => Promise
   createServiceRequest: classifyActionIntentOnly,
   createMigrationTicket: classifyActionIntentOnly,
   createInstallationTicket: classifyActionIntentOnly,
-  findCustomerByName: customerRegistry.findCustomerByName,
-  findCustomerByPhone: customerRegistry.findCustomerByPhone,
-  findCustomerByEmail: customerRegistry.findCustomerByEmail,
-  getPendingTicketsByStaff: exceptionalRegistry.getPendingTicketsByStaff,
-  getOpenTicketsByRegion: exceptionalRegistry.getOpenTicketsByRegion,
-  getTicketsByStaff: exceptionalRegistry.getTicketsByStaff,
-  getTicketsByRegion: exceptionalRegistry.getTicketsByRegion,
-  getTicketsByServiceType: exceptionalRegistry.getTicketsByServiceType,
-  getPendingTickets: exceptionalRegistry.getPendingTickets,
-  getOpenTickets: exceptionalRegistry.getOpenTickets,
-  getCompletedTickets: exceptionalRegistry.getCompletedTickets,
-  getTicketById: exceptionalRegistry.getTicketById,
-  getTicketsByStatusLabel: exceptionalRegistry.getTicketsByStatusLabel,
-  getCompletedTicketsThisWeek: exceptionalRegistry.getCompletedTicketsThisWeek,
-  getTicketsNeedingAttention: exceptionalRegistry.getTicketsNeedingAttention,
-  getTicketsByCustomer: exceptionalRegistry.getTicketsByCustomer,
-  getOpenTicketsByCustomer: exceptionalRegistry.getOpenTicketsByCustomer,
-  getTicketsByIssue: exceptionalRegistry.getTicketsByIssue,
-  getUnassignedTickets: exceptionalRegistry.getUnassignedTickets,
-  getMostCommonIssues: exceptionalRegistry.getMostCommonIssues,
-  getCustomerWithMostRequests: exceptionalRegistry.getCustomerWithMostRequests,
-  getCustomerHistory: exceptionalRegistry.getCustomerHistory,
-  getCustomerFleetSize: customerRegistry.getCustomerFleetSize,
-  getCustomerRegion: customerRegistry.getCustomerRegion,
-  getTechnicianWorkload: exceptionalRegistry.getTechnicianWorkload,
-  getHighestWorkload: exceptionalRegistry.getHighestWorkload,
-  getLowestWorkload: exceptionalRegistry.getLowestWorkload,
-  getStaffPerformance: exceptionalRegistry.getStaffPerformance,
-  getDuplicateRequests: exceptionalRegistry.getDuplicateRequests,
-  getLatestRequests: exceptionalRegistry.getLatestRequests,
-  getDashboardSummary: exceptionalRegistry.getDashboardSummary,
-  getRegionSummary: exceptionalRegistry.getRegionSummary,
-  getStatusSummary: exceptionalRegistry.getStatusSummary,
-  getDailySummary: exceptionalRegistry.getDailySummary,
-  getMonthlySummary: exceptionalRegistry.getMonthlySummary,
-  getStaffChatHistory: exceptionalRegistry.getStaffChatHistory,
-  getGuestChatHistory: exceptionalRegistry.getGuestChatHistory,
+  findCustomerByName: disabledLookupHandler,
+  findCustomerByPhone: disabledLookupHandler,
+  findCustomerByEmail: disabledLookupHandler,
+  getPendingTicketsByStaff: disabledLookupHandler,
+  getOpenTicketsByRegion: disabledLookupHandler,
+  getTicketsByStaff: disabledLookupHandler,
+  getTicketsByRegion: disabledLookupHandler,
+  getTicketsByServiceType: disabledLookupHandler,
+  getPendingTickets: disabledLookupHandler,
+  getOpenTickets: disabledLookupHandler,
+  getCompletedTickets: disabledLookupHandler,
+  getTicketById: disabledLookupHandler,
+  getTicketsByStatusLabel: disabledLookupHandler,
+  getCompletedTicketsThisWeek: disabledLookupHandler,
+  getTicketsNeedingAttention: disabledLookupHandler,
+  getTicketsByCustomer: disabledLookupHandler,
+  getOpenTicketsByCustomer: disabledLookupHandler,
+  getTicketsByIssue: disabledLookupHandler,
+  getUnassignedTickets: disabledLookupHandler,
+  getMostCommonIssues: disabledLookupHandler,
+  getCustomerWithMostRequests: disabledLookupHandler,
+  getCustomerHistory: disabledLookupHandler,
+  getCustomerFleetSize: disabledLookupHandler,
+  getCustomerRegion: disabledLookupHandler,
+  getTechnicianWorkload: disabledLookupHandler,
+  getHighestWorkload: disabledLookupHandler,
+  getLowestWorkload: disabledLookupHandler,
+  getStaffPerformance: disabledLookupHandler,
+  getDuplicateRequests: disabledLookupHandler,
+  getLatestRequests: disabledLookupHandler,
+  getDashboardSummary: disabledLookupHandler,
+  getRegionSummary: disabledLookupHandler,
+  getStatusSummary: disabledLookupHandler,
+  getDailySummary: disabledLookupHandler,
+  getMonthlySummary: disabledLookupHandler,
+  getStaffChatHistory: disabledLookupHandler,
+  getGuestChatHistory: disabledLookupHandler,
 };
 
 export function canonicalQueryParams(intent: SafeQueryIntent, params: Record<string, any> | undefined): Record<string, any> {
