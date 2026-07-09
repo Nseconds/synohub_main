@@ -86,7 +86,7 @@ export function buildSalesplusEntry(input: any, synohubRequestId: number, reques
 }
 
 export async function saveLocalSalesplusEntry(input: any, synohubRequestId: number, requestedPerson: string) {
-  const entry = buildSalesplusEntry(input, synohubRequestId, requestedPerson);
-  await db.insert(salesplusEntries).values(entry);
-  console.log(`[Salesplus Local] Saved mapped entry for SynoHub request #${synohubRequestId}.`);
+  // Disabled as per user request to not save to salesplus_entries
+  console.log(`[Salesplus Local] Skipped saving mapped entry for SynoHub request #${synohubRequestId} (salesplus_entries writes are disabled).`);
+  return;
 }
