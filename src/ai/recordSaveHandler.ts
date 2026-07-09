@@ -11,7 +11,7 @@ import {
   type ForcedServiceRequestFields,
   type ForcedServiceRequestResult,
 } from "../services/serviceRequestService";
-import { extractRegionName, normalizeQueryText } from "./queryIntentDetector";
+import { extractRegionName, normalizeQueryText } from "./aiUtils";
 import { parseForcedServiceRequest } from "./serviceTemplateParser";
 import { extractRecordTriggerJson, findRecordTrigger, removeRecordTrigger } from "./saveRecordParser";
 

@@ -30,36 +30,15 @@ import {
   type QueryProviderName,
 } from "../ai/aiRouter";
 import {
-  actionIntents,
-  detectQueryIntent,
   extractEmail,
   extractPhone,
   extractRegionName,
   normalizeQueryText,
-  providerToDetected,
-  validateQueryIntent,
-  type DetectedQueryIntent,
-  type QueryProviderResult,
-} from "../ai/queryIntentDetector";
+} from "../ai/aiUtils";
 import {
-  runGeminiIntentProvider,
-} from "../ai/intentProviders";
-import {
-  runDetectedSafeQuery,
-  safeQueryHandlers,
-} from "../ai/safeQueryExecutor";
-import {
-  formatOperationalGreeting,
-  isSimpleGreetingMessage,
-} from "../ai/queryReportFormatter";
-import {
-  applyStaffRequestedPersonDefault,
-  cleanLocalChatReply,
   cleanVisibleAssistantText,
-  formatCompareChatReply,
   getModeScopedChatChannel,
   sanitizeProviderChatHistory,
-  type SafeQueryAiMode,
 } from "../ai/responseFormatter";
 import { registerAnalyticsRoutes } from "./analyticsRoutes";
 import { registerAuthRoutes } from "./authRoutes";
@@ -143,15 +122,6 @@ function formatStaffRecordList(title: string, rows: any[]): string {
   }).join("\n\n")}`;
 }
 
-function chooseQueryProvider(
-  mode: SafeQueryAiMode,
-  providers: Record<QueryProviderName, QueryProviderResult>
-): { winner: QueryProviderName; detected: DetectedQueryIntent; mismatch: boolean } {
-  const geminiDetected = providerToDetected(providers.gemini);
-  if (geminiDetected) return { winner: "gemini", detected: geminiDetected, mismatch: false };
-
-  throw Object.assign(new Error("Gemini intent detection failed."), { statusCode: 400 });
-}
 
 export async function startServer() {
   const app = express();
@@ -179,89 +149,7 @@ export async function startServer() {
   registerCustomerRoutes(app);
   registerAnalyticsRoutes(app);
 
-  // Safe natural-language query endpoint. This route never asks AI to generate SQL.
-  app.post("/api/chat/query", requireAuth, async (req, res) => {
-    let detectedForError: DetectedQueryIntent | null = null;
-    try {
-      const authUser = getAuthUser(req);
-      const queryUser = { role: authUser.role, name: authUser.name };
-      const chatIdentity = resolveChatIdentity(authUser);
-      const message = normalizeQueryText(req.body?.message || req.body?.question || req.body?.query);
-      const aiMode = normalizeQueryAiMode(req.body?.aiMode, authUser);
-      const compareProviders = normalizeCompareProviders(req.body?.compareProviders);
-      const chatChannel = getModeScopedChatChannel(chatIdentity.channel, aiMode);
 
-      if (!message) {
-        return res.status(400).json({ error: "Question is required." });
-      }
-
-      await saveChatMessage("user", message, chatChannel);
-
-      const recentMessages = await getRecentChatMessages(chatChannel, 8);
-      const requestedPersonAnswer = await answerRequestedPersonLookup(message, authUser, recentMessages);
-      if (requestedPersonAnswer) {
-        const answer = cleanVisibleAssistantText(requestedPersonAnswer);
-        await saveChatMessage("assistant", answer, chatChannel);
-
-        return res.json({
-          answer,
-          reply: answer,
-          mode: aiMode,
-          winner: "backend",
-          intent: "getTicketsByCustomer",
-          rows: [],
-        });
-      }
-
-      const providers: Record<QueryProviderName, QueryProviderResult> = {
-        gemini: { durationMs: 0, error: "Not run for this mode." },
-      };
-
-      providers.gemini = await runGeminiIntentProvider(message);
-
-      const providerChoice = chooseQueryProvider(aiMode, providers);
-      const detected = validateQueryIntent(providerChoice.detected, safeQueryHandlers);
-      detectedForError = detected;
-
-      const result = await runDetectedSafeQuery(detected, authUser, queryUser);
-      const answer = cleanVisibleAssistantText(result.answer);
-      const rows = result.rows;
-      providers[providerChoice.winner] = {
-        ...providers[providerChoice.winner],
-        params: result.params,
-        answer,
-        rowCount: rows.length,
-      };
-
-      await saveChatMessage("assistant", answer, chatChannel);
-
-      return res.json({
-        answer,
-        mode: aiMode,
-        winner: providerChoice.winner,
-        intent: detected.intent,
-        rows,
-      });
-    } catch (error: any) {
-      const statusCode = typeof error?.statusCode === "number" ? error.statusCode : 500;
-      const answer = cleanVisibleAssistantText(error?.message || "Safe query failed.");
-
-      try {
-        const authUser = getAuthUser(req);
-        const chatIdentity = resolveChatIdentity(authUser);
-        const aiMode = normalizeQueryAiMode(req.body?.aiMode, authUser);
-        await saveChatMessage("assistant", answer, getModeScopedChatChannel(chatIdentity.channel, aiMode));
-      } catch {
-        // Do not mask the original query error with a history-write error.
-      }
-
-      return res.status(statusCode).json({
-        answer,
-        intent: detectedForError?.intent || "unknown",
-        rows: [],
-      });
-    }
-  });
 
   // Chat/AI endpoint
   app.post("/api/chat", requireAuth, async (req, res) => {
@@ -565,11 +453,6 @@ ${allServices.map((s: any) => ` * ID: ${s.id} | Created: "${s.createdAt || ''}" 
 
       const sanitizedChatHistory = () => sanitizeProviderChatHistory(chatHistory);
 
-      if (isSimpleGreetingMessage(message)) {
-        const reply = cleanVisibleAssistantText(formatOperationalGreeting(userName, fetchedRequests));
-        await saveChatMessage("assistant", reply, chatChannel);
-        return res.json({ reply });
-      }
 
       const runGeminiChatReply = async (): Promise<{ reply: string; durationMs: number; error?: string }> => {
         const startTime = Date.now();
