@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { customers, serviceRequests } from "../db/schema";
+import { customers, serviceRequests, users } from "../db/schema";
 import { normalizeUserName, type AuthUser } from "../auth/users";
 
 export async function getDashboardData(authUser: AuthUser) {
@@ -8,6 +8,20 @@ export async function getDashboardData(authUser: AuthUser) {
 
   const allCustomers = await db.select().from(customers);
   let allRequests = await db.select().from(serviceRequests);
+  const allUsers = await db.select().from(users);
+
+  // Map user IDs to names to avoid displaying legacy numerical IDs
+  const userMap = new Map<string, string>();
+  allUsers.forEach(u => {
+    userMap.set(String(u.id), u.name);
+  });
+
+  const resolveUserName = (val: string | number | null | undefined) => {
+    if (val === null || val === undefined) return "";
+    const strVal = String(val).trim();
+    if (!strVal) return "";
+    return userMap.get(strVal) || strVal;
+  };
 
   let filteredCustomers = allCustomers;
   if (userRole === "guest") {
@@ -35,51 +49,71 @@ export async function getDashboardData(authUser: AuthUser) {
     });
   }
 
-  const allRegistrations = allRequests.map(r => ({
-    id: r.id,
-    customerName: r.customerName || "",
-    contactName: r.contactName || "",
-    designation: r.requestedPerson || "",
-    phone: r.phone || "",
-    email: r.email || "",
-    region: r.region || "",
-    address: r.address || "",
-    mapLink: r.mapLink || "",
-    coordinates: r.coordinates || "",
-    source: r.source || "",
-    status: r.status || "New Lead",
-    implementationType: r.implementationType || "",
-    salesPerson: r.salesPerson || "",
-    salesType: r.salesType || "",
-    requestedPerson: r.requestedPerson || "",
-    comment: r.comment || "",
-    projectValue: r.projectValue ? r.projectValue.toString() : "",
-    priceDetails: r.priceDetails || "",
-    accessories: r.accessories || "",
-    newQty: r.newQty || 0,
-    migrateQty: r.migrateQty || 0,
-    tradingQty: r.tradingQty || 0,
-    serviceQty: r.serviceQty || 0,
-    otherQty: r.otherQty || 0,
-    createdAt: r.createdAt
-  }));
+  const allRegistrations = allRequests.map(r => {
+    const rawQty = r.newQty || 0;
+    const type = (r.implementationType || "").toUpperCase();
 
-  const allServices = allRequests.map(s => ({
-    id: s.id,
-    ticketId: s.id ? ("TKT-" + s.id) : "",
-    customerName: s.customerName || "",
-    description: s.issueDescription || s.notes || s.comment || "",
-    status: s.jobStatus || "Pending",
-    quantity: (s.newQty || 0) + (s.migrateQty || 0) + (s.tradingQty || 0) + (s.serviceQty || 0) + (s.otherQty || 0) || 1,
-    requestedPerson: s.requestedPerson || "",
-    payment: s.paymentStatus || "",
-    invoiceStatus: s.paymentStatus === "PAID" ? "Invoiced" : "Not Invoiced",
-    paymentStatus: s.paymentStatus || "",
-    amount: s.amount ? s.amount.toString() : "",
-    assignee: s.salesPerson || s.requestedPerson || "",
-    createdAt: s.createdAt,
-    location: s.location || s.region || ""
-  }));
+    const isMigration = type.includes("MIGRATION");
+    const isTrading = type.includes("TRADING");
+    const isService = type.includes("SERVICE");
+    const isNew = type.includes("LOCATOR") || type.includes("ASATEEL") || type.includes("NEW");
+
+    const newQty = isNew ? rawQty : 0;
+    const migrateQty = isMigration ? rawQty : 0;
+    const tradingQty = isTrading ? rawQty : 0;
+    const serviceQty = isService ? rawQty : 0;
+    const otherQty = (!isNew && !isMigration && !isTrading && !isService) ? rawQty : 0;
+
+    return {
+      id: r.id,
+      customerName: r.customerName || "",
+      contactName: r.contactName || "",
+      designation: resolveUserName(r.requestedPerson),
+      phone: r.phone || "",
+      email: r.email || "",
+      region: r.region || "",
+      address: r.address || "",
+      mapLink: r.mapLink || "",
+      coordinates: r.coordinates || "",
+      source: resolveUserName(r.source),
+      status: r.status || "New Lead",
+      implementationType: r.implementationType || "",
+      salesPerson: resolveUserName(r.salesPerson),
+      salesType: r.salesType || "",
+      requestedPerson: resolveUserName(r.requestedPerson),
+      comment: r.comment || "",
+      projectValue: r.projectValue ? r.projectValue.toString() : "",
+      priceDetails: r.priceDetails || "",
+      accessories: r.accessories || "",
+      newQty,
+      migrateQty,
+      tradingQty,
+      serviceQty,
+      otherQty,
+      createdAt: r.createdAt
+    };
+  });
+
+  const allServices = allRequests.map(s => {
+    const realQty = s.newQty || 1;
+
+    return {
+      id: s.id,
+      ticketId: s.id ? ("TKT-" + s.id) : "",
+      customerName: s.customerName || "",
+      description: s.issueDescription || s.notes || s.comment || "",
+      status: s.jobStatus || "Pending",
+      quantity: realQty,
+      requestedPerson: resolveUserName(s.requestedPerson),
+      payment: s.paymentStatus || "",
+      invoiceStatus: s.paymentStatus === "PAID" ? "Invoiced" : "Not Invoiced",
+      paymentStatus: s.paymentStatus || "",
+      amount: s.amount ? s.amount.toString() : "",
+      assignee: resolveUserName(s.salesPerson) || resolveUserName(s.requestedPerson) || "",
+      createdAt: s.createdAt,
+      location: s.location || s.region || ""
+    };
+  });
 
   return { registrations: allRegistrations, services: allServices, customers: filteredCustomers };
 }
