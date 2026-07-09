@@ -22,6 +22,7 @@ import { runGeminiChatCompletion } from "../ai/providers/gemini";
 import { answerRequestedPersonLookup } from "../ai/directLookupAnswers";
 import {
   isAcknowledgementOnlyMessage,
+  handleAIRecordSave,
 } from "../ai/recordSaveHandler";
 import { buildChatSystemInstruction, loadPrompts } from "../ai";
 
@@ -168,6 +169,19 @@ export async function startServer() {
       const chatIdentity = resolveChatIdentity(authUser, selectedChatTarget || selectedUsername);
       let userRole = chatIdentity.role;
       let userName = chatIdentity.name;
+      if (selectedChatTarget && typeof selectedChatTarget === "string" && selectedChatTarget.startsWith("user:")) {
+        const targetId = parseInt(selectedChatTarget.slice("user:".length).trim());
+        if (!isNaN(targetId)) {
+          const [targetUser] = await db
+            .select({ name: users.name })
+            .from(users)
+            .where(eq(users.id, targetId))
+            .limit(1);
+          if (targetUser) {
+            userName = targetUser.name.trim();
+          }
+        }
+      }
       const chatChannel = getModeScopedChatChannel(chatIdentity.channel, aiMode);
 
       if (authUser.role === "admin" && chatIdentity.channel !== "admin" && !chatIdentity.channel.startsWith("user:")) {
@@ -500,7 +514,8 @@ ${allServices.map((s: any) => ` * ID: ${s.id} | Created: "${s.createdAt || ''}" 
       }
       let reply = geminiResult.reply;
 
-      let finalReply = reply.replace(/\[{1,2}SAVE_RECORD:[\s\S]*?\]{1,2}/g, "").trim();
+      const saveRes = await handleAIRecordSave(reply, userRole, userName);
+      let finalReply = saveRes.reply;
       if (prependAccessRestricted && !finalReply.startsWith("Access Restricted:")) {
         finalReply = "Access Restricted: You can only view records created by your account.\n\n" + finalReply;
       }
@@ -512,6 +527,7 @@ ${allServices.map((s: any) => ` * ID: ${s.id} | Created: "${s.createdAt || ''}" 
       return res.json({
         reply: finalReply,
         selectedProvider: "gemini",
+        savedRecord: saveRes.savedRecord,
       });
     } catch (error) {
       res.status(500).json({ error: (error as Error).message });

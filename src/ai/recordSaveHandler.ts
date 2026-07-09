@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { eq } from "drizzle-orm";
+import { eq, like } from "drizzle-orm";
 import { db } from "../db";
 import { customers, serviceRequests } from "../db/schema";
 import type { AuthUser } from "../auth/users";
@@ -80,9 +80,13 @@ function mapInputToSchema(input: any): any {
 }
 
 function applyRequiredRequestedPerson(mapped: any, userRole: string, userName: string): string | null {
-  const resolvedPerson = userRole === "staff" && userName
-    ? userName
-    : String(mapped.requestedPerson || mapped.salesPerson || "").trim();
+  let resolvedPerson = String(mapped.requestedPerson || "").trim();
+  if (!resolvedPerson && userName) {
+    resolvedPerson = userName.trim();
+  }
+  if (!resolvedPerson) {
+    resolvedPerson = String(mapped.salesPerson || "").trim();
+  }
 
   if (!resolvedPerson) return null;
 
@@ -422,16 +426,35 @@ export async function handleAIRecordSave(reply: string, userRole: string = "gues
       
       // Verify if customer exists in the database
       if (mapped.customerName) {
-        const [existingCustomer] = await db
-          .select({ id: customers.id })
+        const inputName = mapped.customerName.trim();
+        const matchedCustomers = await db
+          .select({ id: customers.id, name: customers.name })
           .from(customers)
-          .where(eq(customers.name, mapped.customerName.trim()))
-          .limit(1);
+          .where(like(customers.name, `%${inputName}%`));
 
-        if (!existingCustomer) {
+        if (matchedCustomers.length === 0) {
           return {
             reply: "this user is not exist in db",
           };
+        }
+
+        const exactMatch = matchedCustomers.find(
+          (c) => (c.name || "").trim().toLowerCase() === inputName.toLowerCase()
+        );
+
+        if (!exactMatch) {
+          if (matchedCustomers.length > 1) {
+            const listStr = matchedCustomers
+              .map((c) => `- ${c.name}`)
+              .join("\n");
+            return {
+              reply: `Multiple matching customers found for "${inputName}". Please specify the correct one:\n${listStr}`,
+            };
+          } else {
+            mapped.customerName = matchedCustomers[0].name;
+          }
+        } else {
+          mapped.customerName = exactMatch.name;
         }
       }
 

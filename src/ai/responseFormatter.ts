@@ -1,6 +1,9 @@
 export type SafeQueryAiMode = "gemini";
 
 export function getModeScopedChatChannel(channel: string, aiMode: SafeQueryAiMode): string {
+  if (/^\d+$/.test(channel)) {
+    return channel;
+  }
   return `${channel}|ai:${aiMode}`;
 }
 
