@@ -36,7 +36,7 @@ import {
   getModeScopedChatChannel,
   sanitizeProviderChatHistory,
 } from "../ai/responseFormatter";
-import { registerAnalyticsRoutes } from "./analyticsRoutes";
+
 import { registerAuthRoutes } from "./authRoutes";
 import { registerCustomerRoutes } from "./customerRoutes";
 import { registerDashboardRoutes } from "./dashboardRoutes";
@@ -143,7 +143,6 @@ export async function startServer() {
   registerDashboardRoutes(app);
   registerServiceRequestRoutes(app);
   registerCustomerRoutes(app);
-  registerAnalyticsRoutes(app);
 
 
 
