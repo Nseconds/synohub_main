@@ -407,62 +407,8 @@ export async function handleAIRecordSave(reply: string, userRole: string = "gues
     console.log(`[AI Auto-Save] Detected record save: ${record.type} by role=${userRole}`);
 
     if (record.type === "registration") {
-      const mapped = mapInputToSchema(record);
-      normalizeMappedContactAndCustomer(mapped);
-      const requestedPerson = applyRequiredRequestedPerson(mapped, userRole, userName);
-      if (!requestedPerson) {
-        return {
-          reply: cleanVisibleSavedRecordReply(removeRecordTrigger(reply, saveMatch)) + "\n\nMissing required field: Requested Person. Please tell me who requested this ticket before I save it.",
-        };
-      }
-
-      const [res]: any = await db.insert(serviceRequests).values({
-        customerName: mapped.customerName || "Unknown",
-        contactName: mapped.contactName || "",
-        phone: mapped.phone || "",
-        email: mapped.email || "",
-        region: mapped.region || "",
-        address: mapped.address || "",
-        mapLink: mapped.mapLink || "",
-        coordinates: mapped.coordinates || "",
-        source: mapped.source || "",
-        status: mapped.status || "New Lead",
-        implementationType: mapped.implementationType || "",
-        salesPerson: mapped.salesPerson || "",
-        salesType: mapped.salesType || "",
-        requestedPerson: mapped.requestedPerson || "",
-        comment: mapped.comment || "",
-        projectValue: mapped.projectValue || "",
-        priceDetails: mapped.priceDetails || "",
-        accessories: mapped.accessories || "",
-        newQty: mapped.newQty || 0,
-        migrateQty: mapped.migrateQty || 0,
-        tradingQty: mapped.tradingQty || 0,
-        serviceQty: mapped.serviceQty || 0,
-        otherQty: mapped.otherQty || 0,
-        createdBy: userName || "guest",
-      });
-
-      try {
-        await saveLocalSalesplusEntry(mapped, res.insertId, mapped.requestedPerson || "");
-      } catch (salesplusErr) {
-        console.error("Failed to save local Salesplus entry:", salesplusErr);
-      }
-
-      try {
-        const syncResult = await syncRegistrationCustomer(mapped, userName || "guest", 1);
-        if (syncResult.action === "created") {
-          console.log(`[AI Auto-Save] Synchronized customer ${syncResult.customerName} into customers table.`);
-        } else if (syncResult.action === "updated") {
-          console.log(`[AI Auto-Save] Updated existing customer ${syncResult.customerName} vehicleCount to ${syncResult.vehicleCount}`);
-        }
-      } catch (custErr) {
-        console.error("Failed to auto-sync customer:", custErr);
-      }
-
       return {
-        reply: cleanVisibleSavedRecordReply(removeRecordTrigger(reply, saveMatch)) + `\n\n(CRM: Registration saved successfully. ID: ${res.insertId})`,
-        savedRecord: { ...record, ...mapped, id: res.insertId },
+        reply: "Lead and registration creation via the AI chatbot is disabled. Please use the Existing Form page to register new customer leads.",
       };
     } else if (record.type === "service") {
       const ticketId = record.ticketId || (`TKT-${crypto.randomBytes(4).toString("hex").toUpperCase()}`);

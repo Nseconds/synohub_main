@@ -641,44 +641,9 @@ export default function App() {
                     staffOptions={requestedPeopleList}
                     forcedInput={prefilledChatPrompt}
                     onInputLoaded={() => setPrefilledChatPrompt("")}
-                    onNewStaffDetected={(name) => {
-                      if (!requestedPeopleList.some(p => p.toLowerCase() === name.toLowerCase())) {
-                        setPendingStaffName(name);
-                      }
-                    }}
                     onRecordSaved={(savedRecord) => {
                         fetchData();
-                      if (savedRecord && savedRecord.type === "registration") {
-                        setLeadForm({
-                          customerName: savedRecord.customerName || "",
-                          contactName: savedRecord.contactName || "",
-                          phone: savedRecord.phone || "",
-                          email: savedRecord.email || "",
-                          region: findOptionMatch(savedRecord.region, REGIONS, REGIONS[0]),
-                          address: savedRecord.address || "",
-                          mapLink: savedRecord.mapLink || "",
-                          coordinates: savedRecord.coordinates || "",
-                          source: findOptionMatch(savedRecord.source, SOURCES, "Company Lead"),
-                          status: findOptionMatch(savedRecord.status, LEAD_STATUSES, "New Lead"),
-                          implementationType: findOptionMatch(savedRecord.implementationType, IMPLEMENTATION_TYPES, "LOCATOR"),
-                          salesPerson: findOptionMatch(savedRecord.salesPerson, SALES_PEOPLE, "Nishad"),
-                          salesType: findOptionMatch(savedRecord.salesType, SALES_TYPES, "New"),
-                          requestedPerson: findOptionMatch(savedRecord.requestedPerson, requestedPeopleList),
-                          comment: savedRecord.comment || "",
-                          projectValue: savedRecord.projectValue || "",
-                          priceDetails: savedRecord.priceDetails || "",
-                          accessories: savedRecord.accessories || "",
-                          newQty: savedRecord.newQty || savedRecord.qty || 0,
-                          migrateQty: savedRecord.migrateQty || 0,
-                          tradingQty: savedRecord.tradingQty || 0,
-                          serviceQty: savedRecord.serviceQty || 0,
-                          otherQty: savedRecord.otherQty || 0
-                        });
-                        if (savedRecord.id) {
-                          setSelectedLeadId(savedRecord.id);
-                        }
-                        showToast(`AI Auto-Saved: Lead "${savedRecord.customerName}" successfully logged into CRM!`, "success");
-                      } else if (savedRecord && savedRecord.type === "service") {
+                      if (savedRecord && savedRecord.type === "service") {
                         showToast(`AI Auto-Saved: Service Ticket for "${savedRecord.customerName}" logged!`, "success");
                       }
                     }}

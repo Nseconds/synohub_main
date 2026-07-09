@@ -12,7 +12,6 @@ interface AiPageProps {
   staffOptions: string[];
   forcedInput: string;
   onInputLoaded: () => void;
-  onNewStaffDetected: (name: string) => void;
   onRecordSaved: (savedRecord?: any) => void;
 }
 
@@ -21,7 +20,6 @@ export const AiPage = ({
   staffOptions,
   forcedInput,
   onInputLoaded,
-  onNewStaffDetected,
   onRecordSaved,
 }: AiPageProps) => (
   <motion.div
@@ -41,7 +39,6 @@ export const AiPage = ({
       staffOptions={staffOptions}
       forcedInput={forcedInput}
       onInputLoaded={onInputLoaded}
-      onNewStaffDetected={onNewStaffDetected}
       onRecordSaved={onRecordSaved}
     />
   </motion.div>

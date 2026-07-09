@@ -13,7 +13,6 @@ interface CurrentUser {
 
 interface ChatInterfaceProps {
   onRecordSaved?: (savedRecord?: any) => void;
-  onNewStaffDetected?: (name: string) => void;
   forcedInput?: string;
   onInputLoaded?: () => void;
   userKey?: string;
@@ -23,7 +22,6 @@ interface ChatInterfaceProps {
 
 export const ChatInterface = ({
   onRecordSaved,
-  onNewStaffDetected,
   forcedInput,
   onInputLoaded,
   userKey,
@@ -115,15 +113,6 @@ export const ChatInterface = ({
     setLoading(true);
     const sendScopeKey = chatScopeKey;
 
-    const introMatch = userMsg.match(/(?:i\s*a+m|i'm|ia+m|ia+am|my\s+name\s+is|this\s+is)\s+([a-zA-Z]{3,20})/i);
-    if (introMatch && introMatch[1]) {
-      const potentialName = introMatch[1].trim();
-      const capitalized = potentialName.charAt(0).toUpperCase() + potentialName.slice(1).toLowerCase();
-      if (onNewStaffDetected) {
-        onNewStaffDetected(capitalized);
-      }
-    }
-
     try {
       const useSafeQuery = isSafeQueryMessage(userMsg);
       const payload: any = { message: userMsg, aiMode: "gemini" };
@@ -136,11 +125,6 @@ export const ChatInterface = ({
       if (res.savedRecord) {
         if (onRecordSaved) {
           onRecordSaved(res.savedRecord);
-        }
-        if (res.savedRecord.requestedPerson && onNewStaffDetected) {
-          const p = res.savedRecord.requestedPerson.trim();
-          const capitalized = p.charAt(0).toUpperCase() + p.slice(1).toLowerCase();
-          onNewStaffDetected(capitalized);
         }
       }
     } catch (e) {
