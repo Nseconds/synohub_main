@@ -24,11 +24,7 @@ import {
   isAcknowledgementOnlyMessage,
 } from "../ai/recordSaveHandler";
 import { buildChatSystemInstruction, loadPrompts } from "../ai";
-import {
-  normalizeCompareProviders,
-  normalizeQueryAiMode,
-  type QueryProviderName,
-} from "../ai/aiRouter";
+
 import {
   extractEmail,
   extractPhone,
@@ -156,9 +152,7 @@ export async function startServer() {
     try {
       const { message, selectedChatTarget, selectedUsername } = req.body;
       const authUser = getAuthUser(req);
-      const aiMode = normalizeQueryAiMode(req.body?.aiMode, authUser);
-      const compareProviders = normalizeCompareProviders(req.body?.compareProviders);
-      const chatProviderMode = aiMode;
+      const aiMode = "gemini";
       const chatIdentity = resolveChatIdentity(authUser, selectedChatTarget || selectedUsername);
       let userRole = chatIdentity.role;
       let userName = chatIdentity.name;
@@ -519,7 +513,7 @@ ${allServices.map((s: any) => ` * ID: ${s.id} | Created: "${s.createdAt || ''}" 
       const userRole = authUser.role;
       const userName = authUser.name.trim();
       const requestedAiMode = typeof req.query.aiMode === "string"
-        ? normalizeQueryAiMode(req.query.aiMode, authUser)
+        ? "gemini"
         : null;
       const historyPredicateFor = (channel: string) => {
         return requestedAiMode
