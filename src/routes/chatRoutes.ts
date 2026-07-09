@@ -19,7 +19,6 @@ import {
   genAI,
 } from "../ai/providerConfig";
 import { runGeminiChatCompletion } from "../ai/providers/gemini";
-import { answerRequestedPersonLookup } from "../ai/directLookupAnswers";
 import {
   isAcknowledgementOnlyMessage,
   handleAIRecordSave,
@@ -195,17 +194,6 @@ export async function startServer() {
 
       // Save user message (partitioned by username)
       await saveChatMessage("user", message, chatChannel);
-
-      const requestedPersonAnswer = await answerRequestedPersonLookup(message, authUser, persistedHistory);
-      if (requestedPersonAnswer) {
-        const reply = cleanVisibleAssistantText(requestedPersonAnswer);
-        await saveChatMessage("assistant", reply, chatChannel);
-        return res.json({
-          reply,
-          selectedProvider: "backend",
-          intent: "requestedPersonLookup",
-        });
-      }
 
       if (isAcknowledgementOnlyMessage(message)) {
         const reply = cleanVisibleAssistantText("Okay.");
