@@ -19,7 +19,7 @@ export async function getDashboardData(authUser: AuthUser) {
   const resolveUserName = (val: string | number | null | undefined) => {
     if (val === null || val === undefined) return "";
     const strVal = String(val).trim();
-    if (!strVal) return "";
+    if (!strVal || strVal === "0") return "";
     return userMap.get(strVal) || strVal;
   };
 

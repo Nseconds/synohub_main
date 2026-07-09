@@ -147,6 +147,7 @@ export function DashboardPage({
 
   const leaderboardSorted = Object.entries(repPerformanceMap)
     .map(([name, stats]) => ({ name, ...stats }))
+    .filter(rep => rep.name !== "Unassigned" && rep.name !== "admin" && rep.name !== "0" && rep.name !== "")
     .sort((a, b) => b.value - a.value)
     .slice(0, 5);
 
