@@ -45,7 +45,7 @@ export const CustomersPage = ({
         No matched customer accounts found. Submit form below to create a new one.
       </div>
     ) : (
-      <div className="overflow-x-auto max-h-48 scrollbar-thin">
+      <div className="overflow-x-auto max-h-[70vh] scrollbar-thin">
         <table className="w-full text-left text-[11px]">
           <thead className="bg-[#F8FAFC] border-b border-zinc-200 text-zinc-500 uppercase text-[9px] tracking-wider font-bold">
             <tr>

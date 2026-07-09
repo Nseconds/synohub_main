@@ -16,6 +16,7 @@ import { AiPage } from "./frontend/pages/AiPage";
 import { DashboardPage } from "./frontend/pages/DashboardPage";
 import { LeadFormPage } from "./frontend/pages/LeadFormPage";
 import { LoginPage } from "./frontend/pages/LoginPage";
+import { CustomersPage } from "./frontend/pages/CustomersPage";
 import type { Customer, Registration, ServiceTicket } from "./frontend/types";
 import { isValidStoredUser } from "./frontend/utils/auth";
 
@@ -577,95 +578,113 @@ export default function App() {
                </form>
             </Modal>
 
-            {activeTab === "overview" && (
-              <DashboardPage
-                registrations={data?.registrations || []}
-                showAllFeed={showAllFeed}
-                onSelectLead={(leadId) => {
-                  setSelectedLeadId(leadId);
-                  setActiveTab("existing-form");
-                }}
-                onToggleShowAllFeed={() => setShowAllFeed(!showAllFeed)}
-              />
-            )}
+            {searchTerm.trim() !== "" ? (
+              <div className="bg-[#F8FAFC] min-h-screen p-8">
+                <CustomersPage
+                  searchTerm={searchTerm}
+                  customers={filteredCustomers}
+                  registrations={data?.registrations || []}
+                  actionLabel="Select Customer"
+                  onSelectCustomer={(cust) => {
+                    handleSelectCustomer(cust);
+                    setSearchTerm("");
+                    setActiveTab("existing-form");
+                  }}
+                />
+              </div>
+            ) : (
+              <>
+                {activeTab === "overview" && (
+                  <DashboardPage
+                    registrations={data?.registrations || []}
+                    showAllFeed={showAllFeed}
+                    onSelectLead={(leadId) => {
+                      setSelectedLeadId(leadId);
+                      setActiveTab("existing-form");
+                    }}
+                    onToggleShowAllFeed={() => setShowAllFeed(!showAllFeed)}
+                  />
+                )}
 
-            {activeTab === "existing-form" && (
-              <LeadFormPage
-                mode="existing"
-                leadForm={leadForm}
-                setLeadForm={setLeadForm}
-                onSubmit={handleLeadSubmit}
-                onResetLeadForm={resetLeadForm}
-                onCloseExisting={() => setActiveTab("overview")}
-                searchTerm={searchTerm}
-                filteredCustomers={filteredCustomers}
-                registrations={data?.registrations || []}
-                customers={data?.customers || []}
-                onSelectCustomer={handleSelectCustomer}
-                showSuggestions={showSuggestions}
-                setShowSuggestions={setShowSuggestions}
-                showExistingSuggestions={showExistingSuggestions}
-                setShowExistingSuggestions={setShowExistingSuggestions}
-                selectedLeadId={selectedLeadId}
-                user={user}
-                sources={SOURCES}
-                regions={REGIONS}
-                leadStatuses={LEAD_STATUSES}
-                implementationTypes={IMPLEMENTATION_TYPES}
-                salesPeople={SALES_PEOPLE}
-                salesTypes={SALES_TYPES}
-                requestedPeopleList={requestedPeopleList}
-              />
-            )}
+                {activeTab === "existing-form" && (
+                  <LeadFormPage
+                    mode="existing"
+                    leadForm={leadForm}
+                    setLeadForm={setLeadForm}
+                    onSubmit={handleLeadSubmit}
+                    onResetLeadForm={resetLeadForm}
+                    onCloseExisting={() => setActiveTab("overview")}
+                    searchTerm={searchTerm}
+                    filteredCustomers={filteredCustomers}
+                    registrations={data?.registrations || []}
+                    customers={data?.customers || []}
+                    onSelectCustomer={handleSelectCustomer}
+                    showSuggestions={showSuggestions}
+                    setShowSuggestions={setShowSuggestions}
+                    showExistingSuggestions={showExistingSuggestions}
+                    setShowExistingSuggestions={setShowExistingSuggestions}
+                    selectedLeadId={selectedLeadId}
+                    user={user}
+                    sources={SOURCES}
+                    regions={REGIONS}
+                    leadStatuses={LEAD_STATUSES}
+                    implementationTypes={IMPLEMENTATION_TYPES}
+                    salesPeople={SALES_PEOPLE}
+                    salesTypes={SALES_TYPES}
+                    requestedPeopleList={requestedPeopleList}
+                  />
+                )}
 
-            {activeTab === "ai" && (
-              <AiPage
-                user={user}
-                staffOptions={requestedPeopleList}
-                forcedInput={prefilledChatPrompt}
-                onInputLoaded={() => setPrefilledChatPrompt("")}
-                onNewStaffDetected={(name) => {
-                  if (!requestedPeopleList.some(p => p.toLowerCase() === name.toLowerCase())) {
-                    setPendingStaffName(name);
-                  }
-                }}
-                onRecordSaved={(savedRecord) => {
-                    fetchData();
-                  if (savedRecord && savedRecord.type === "registration") {
-                    setLeadForm({
-                      customerName: savedRecord.customerName || "",
-                      contactName: savedRecord.contactName || "",
-                      phone: savedRecord.phone || "",
-                      email: savedRecord.email || "",
-                      region: findOptionMatch(savedRecord.region, REGIONS, REGIONS[0]),
-                      address: savedRecord.address || "",
-                      mapLink: savedRecord.mapLink || "",
-                      coordinates: savedRecord.coordinates || "",
-                      source: findOptionMatch(savedRecord.source, SOURCES, "Company Lead"),
-                      status: findOptionMatch(savedRecord.status, LEAD_STATUSES, "New Lead"),
-                      implementationType: findOptionMatch(savedRecord.implementationType, IMPLEMENTATION_TYPES, "LOCATOR"),
-                      salesPerson: findOptionMatch(savedRecord.salesPerson, SALES_PEOPLE, "Nishad"),
-                      salesType: findOptionMatch(savedRecord.salesType, SALES_TYPES, "New"),
-                      requestedPerson: findOptionMatch(savedRecord.requestedPerson, requestedPeopleList),
-                      comment: savedRecord.comment || "",
-                      projectValue: savedRecord.projectValue || "",
-                      priceDetails: savedRecord.priceDetails || "",
-                      accessories: savedRecord.accessories || "",
-                      newQty: savedRecord.newQty || savedRecord.qty || 0,
-                      migrateQty: savedRecord.migrateQty || 0,
-                      tradingQty: savedRecord.tradingQty || 0,
-                      serviceQty: savedRecord.serviceQty || 0,
-                      otherQty: savedRecord.otherQty || 0
-                    });
-                    if (savedRecord.id) {
-                      setSelectedLeadId(savedRecord.id);
-                    }
-                    showToast(`AI Auto-Saved: Lead "${savedRecord.customerName}" successfully logged into CRM!`, "success");
-                  } else if (savedRecord && savedRecord.type === "service") {
-                    showToast(`AI Auto-Saved: Service Ticket for "${savedRecord.customerName}" logged!`, "success");
-                  }
-                }}
-              />
+                {activeTab === "ai" && (
+                  <AiPage
+                    user={user}
+                    staffOptions={requestedPeopleList}
+                    forcedInput={prefilledChatPrompt}
+                    onInputLoaded={() => setPrefilledChatPrompt("")}
+                    onNewStaffDetected={(name) => {
+                      if (!requestedPeopleList.some(p => p.toLowerCase() === name.toLowerCase())) {
+                        setPendingStaffName(name);
+                      }
+                    }}
+                    onRecordSaved={(savedRecord) => {
+                        fetchData();
+                      if (savedRecord && savedRecord.type === "registration") {
+                        setLeadForm({
+                          customerName: savedRecord.customerName || "",
+                          contactName: savedRecord.contactName || "",
+                          phone: savedRecord.phone || "",
+                          email: savedRecord.email || "",
+                          region: findOptionMatch(savedRecord.region, REGIONS, REGIONS[0]),
+                          address: savedRecord.address || "",
+                          mapLink: savedRecord.mapLink || "",
+                          coordinates: savedRecord.coordinates || "",
+                          source: findOptionMatch(savedRecord.source, SOURCES, "Company Lead"),
+                          status: findOptionMatch(savedRecord.status, LEAD_STATUSES, "New Lead"),
+                          implementationType: findOptionMatch(savedRecord.implementationType, IMPLEMENTATION_TYPES, "LOCATOR"),
+                          salesPerson: findOptionMatch(savedRecord.salesPerson, SALES_PEOPLE, "Nishad"),
+                          salesType: findOptionMatch(savedRecord.salesType, SALES_TYPES, "New"),
+                          requestedPerson: findOptionMatch(savedRecord.requestedPerson, requestedPeopleList),
+                          comment: savedRecord.comment || "",
+                          projectValue: savedRecord.projectValue || "",
+                          priceDetails: savedRecord.priceDetails || "",
+                          accessories: savedRecord.accessories || "",
+                          newQty: savedRecord.newQty || savedRecord.qty || 0,
+                          migrateQty: savedRecord.migrateQty || 0,
+                          tradingQty: savedRecord.tradingQty || 0,
+                          serviceQty: savedRecord.serviceQty || 0,
+                          otherQty: savedRecord.otherQty || 0
+                        });
+                        if (savedRecord.id) {
+                          setSelectedLeadId(savedRecord.id);
+                        }
+                        showToast(`AI Auto-Saved: Lead "${savedRecord.customerName}" successfully logged into CRM!`, "success");
+                      } else if (savedRecord && savedRecord.type === "service") {
+                        showToast(`AI Auto-Saved: Service Ticket for "${savedRecord.customerName}" logged!`, "success");
+                      }
+                    }}
+                  />
+                )}
+              </>
             )}
 
 
