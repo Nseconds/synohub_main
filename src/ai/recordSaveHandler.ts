@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { eq, like } from "drizzle-orm";
+import { eq, like, or } from "drizzle-orm";
 import { db } from "../db";
 import { customers, serviceRequests } from "../db/schema";
 import type { AuthUser } from "../auth/users";
@@ -427,10 +427,22 @@ export async function handleAIRecordSave(reply: string, userRole: string = "gues
       // Verify if customer exists in the database
       if (mapped.customerName) {
         const inputName = mapped.customerName.trim();
-        const matchedCustomers = await db
+        let matchedCustomers = await db
           .select({ id: customers.id, name: customers.name })
           .from(customers)
           .where(like(customers.name, `%${inputName}%`));
+
+        if (matchedCustomers.length === 0) {
+          const words = inputName.split(/\s+/).map(w => w.trim()).filter(w => w.length > 2);
+          if (words.length > 0) {
+            const conditions = words.map(w => like(customers.name, `%${w}%`));
+            matchedCustomers = await db
+              .select({ id: customers.id, name: customers.name })
+              .from(customers)
+              .where(or(...conditions))
+              .limit(5);
+          }
+        }
 
         if (matchedCustomers.length === 0) {
           return {
@@ -443,16 +455,15 @@ export async function handleAIRecordSave(reply: string, userRole: string = "gues
         );
 
         if (!exactMatch) {
-          if (matchedCustomers.length > 1) {
-            const listStr = matchedCustomers
-              .map((c) => `- ${c.name}`)
-              .join("\n");
-            return {
-              reply: `Multiple matching customers found for "${inputName}". Please specify the correct one:\n${listStr}`,
-            };
-          } else {
-            mapped.customerName = matchedCustomers[0].name;
-          }
+          const listStr = matchedCustomers
+            .map((c) => `- ${c.name}`)
+            .join("\n");
+          const questionWord = matchedCustomers.length === 1 
+            ? "is that the customer you are asking for?" 
+            : "did you mean one of these?";
+          return {
+            reply: `Customer "${inputName}" was not found. Please clarify, ${questionWord}\n${listStr}`,
+          };
         } else {
           mapped.customerName = exactMatch.name;
         }
