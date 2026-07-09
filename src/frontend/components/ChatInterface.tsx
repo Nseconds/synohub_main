@@ -37,10 +37,12 @@ export const ChatInterface = ({
   const [selectedChatTarget, setSelectedChatTarget] = useState("admin");
   const [aiMode, setAiMode] = useState<SafeQueryAiMode>("gemini");
   const compareProviders: CompareProvider[] = ["gemini"];
-  const isAdminViewingOtherChat = currentUser?.role === "admin" && selectedChatTarget !== "admin";
+  const isAdminViewingOtherChat = currentUser?.role === "admin" && selectedChatTarget !== "admin" && !selectedChatTarget.startsWith("user:");
   const chatScopeKey = `${userKey || ""}|${currentUser?.role || ""}|${selectedChatTarget}|${aiMode}`;
+  const [usersList, setUsersList] = useState<{ id: number; name: string; username: string }[]>([]);
 
   const getBaseChatChannel = (target: string) => {
+    if (target.startsWith("user:")) return target;
     if (!currentUser) return "";
     if (currentUser.role === "admin") return target || "admin";
     if (currentUser.role === "staff") return `staff:${currentUser.name.trim()}`;
@@ -59,15 +61,32 @@ export const ChatInterface = ({
   const toggleCompareProvider = (_provider: CompareProvider) => {};
 
   useEffect(() => {
+    if (!currentUser) return;
+    fetch("/api/users", {
+      headers: {
+        Authorization: `Bearer ${currentUser.token}`
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setUsersList(data);
+          const matched = data.find(u => u.name.trim().toLowerCase() === currentUser.name.trim().toLowerCase() || u.username.trim().toLowerCase() === currentUser.name.trim().toLowerCase());
+          if (matched) {
+            setSelectedChatTarget(`user:${matched.id}`);
+          } else if (data.length > 0) {
+            setSelectedChatTarget(`user:${data[0].id}`);
+          }
+        }
+      })
+      .catch(err => console.error("Failed to load users:", err));
+  }, [currentUser]);
+
+  useEffect(() => {
     activeChatScopeRef.current = chatScopeKey;
     setMessages([]);
     fetchHistory(chatScopeKey, aiMode, selectedChatTarget, currentUser?.role);
   }, [chatScopeKey, aiMode, selectedChatTarget, currentUser?.role]);
-
-  useEffect(() => {
-    if (currentUser?.role !== "admin") return;
-    setSelectedChatTarget("admin");
-  }, [currentUser?.role]);
 
   useEffect(() => {
     if (forcedInput) {
@@ -154,6 +173,7 @@ export const ChatInterface = ({
       onChatTargetChange={setSelectedChatTarget}
       onInputChange={setInput}
       onSend={handleSend}
+      usersList={usersList}
     />
   );
 };

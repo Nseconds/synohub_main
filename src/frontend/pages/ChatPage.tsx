@@ -36,6 +36,7 @@ interface ChatPageProps {
   onChatTargetChange: (target: string) => void;
   onInputChange: (value: string) => void;
   onSend: () => void;
+  usersList?: { id: number; name: string; username: string }[];
 }
 
 const getChatTargetLabel = (target: string) => {
@@ -62,6 +63,7 @@ export const ChatPage = ({
   onChatTargetChange,
   onInputChange,
   onSend,
+  usersList = [],
 }: ChatPageProps) => (
   <div className="max-w-4xl mx-auto px-4">
     {/* Primary Chat Area */}
@@ -103,6 +105,23 @@ export const ChatPage = ({
             )}
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            {usersList.length > 0 && (
+              <div className="flex items-center gap-2">
+                <MessageSquare size={14} className="text-zinc-500" />
+                <span className="text-zinc-500 font-medium">Choose User to Chat:</span>
+                <select
+                  value={selectedChatTarget}
+                  onChange={(e) => onChatTargetChange(e.target.value)}
+                  className="bg-white border border-zinc-200 rounded px-2 py-1 text-xs text-zinc-800 font-bold focus:outline-none focus:border-teal-accent/50 cursor-pointer shadow-xs"
+                >
+                  {usersList.map((u) => (
+                    <option key={u.id} value={`user:${u.id}`}>
+                      {u.name} ({u.username})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <Sparkles size={14} className="text-zinc-500" />
               <span className="text-zinc-500 font-medium">AI Mode:</span>

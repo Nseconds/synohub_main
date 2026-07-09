@@ -36,6 +36,13 @@ export function registerAuthRoutes(app: Express) {
         return res.status(401).json({ error: "Incorrect username or password." });
       }
 
+      const isFeroz = normalizedUser === "feroz" || normalizedUser === "feros" || 
+                      user.name.trim().toLowerCase() === "feroz" || user.name.trim().toLowerCase() === "feros";
+      const isDevTeam = user.type.trim().toLowerCase() === "development team";
+      if (isDevTeam && !isFeroz) {
+        return res.status(401).json({ error: "Access Denied. Development team members do not have access." });
+      }
+
       const role = roleFromUserType(user.type);
       const authUser = { sub: `user:${user.id}`, role, name: user.name.trim() || user.username };
       return res.json({

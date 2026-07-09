@@ -15,6 +15,13 @@ export function resolveChatIdentity(authUser: AuthUser, requestedTarget?: unknow
         : `guest:${normalizedGuestName}`,
   };
 
+  if (typeof requestedTarget === "string") {
+    const target = requestedTarget.trim();
+    if (target.startsWith("user:")) {
+      return { role: authUser.role, name: authUser.name, channel: target };
+    }
+  }
+
   if (authUser.role !== "admin" || typeof requestedTarget !== "string") {
     return fallback;
   }

@@ -5,7 +5,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { db } from "../db";
 import { initDB } from "../db/init";
-import { customers, serviceRequests } from "../db/schema";
+import { customers, serviceRequests, users } from "../db/schema";
 import { eq, like, or, desc } from "drizzle-orm";
 import env from "../shared/validation/env";
 
@@ -146,6 +146,19 @@ export async function startServer() {
 
 
 
+  app.get("/api/users", requireAuth, async (req, res) => {
+    try {
+      const allUsers = await db.select({
+        id: users.id,
+        name: users.name,
+        username: users.username
+      }).from(users);
+      res.json(allUsers);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
   // Chat/AI endpoint
   app.post("/api/chat", requireAuth, async (req, res) => {
     try {
@@ -157,7 +170,7 @@ export async function startServer() {
       let userName = chatIdentity.name;
       const chatChannel = getModeScopedChatChannel(chatIdentity.channel, aiMode);
 
-      if (authUser.role === "admin" && chatIdentity.channel !== "admin") {
+      if (authUser.role === "admin" && chatIdentity.channel !== "admin" && !chatIdentity.channel.startsWith("user:")) {
         return res.status(403).json({ error: "Admin can only view guest and staff chats. Switch to Admin chat to send messages." });
       }
 
@@ -520,21 +533,9 @@ ${allServices.map((s: any) => ` * ID: ${s.id} | Created: "${s.createdAt || ''}" 
           : chatHistoryPredicates(channel);
       };
 
-      let history;
-      if (userRole === "admin") {
-        // Admins can review a specific channel: admin, guest, or staff:<name>.
-        const target = (req.query.target || req.query.username) as string | undefined;
-        if (target) {
-          const chatIdentity = resolveChatIdentity(authUser, target);
-          history = await getChatMessagesByPredicate(historyPredicateFor(chatIdentity.channel));
-        } else {
-          history = await getChatMessagesByPredicate(historyPredicateFor("admin"));
-        }
-      } else {
-        // Filter by username specifically
-        const chatIdentity = resolveChatIdentity(authUser);
-        history = await getChatMessagesByPredicate(historyPredicateFor(chatIdentity.channel));
-      }
+      const target = (req.query.target || req.query.username) as string | undefined;
+      const chatIdentity = resolveChatIdentity(authUser, target);
+      const history = await getChatMessagesByPredicate(historyPredicateFor(chatIdentity.channel));
       res.json(history);
     } catch (error) {
       res.status(500).json({ error: (error as Error).message });
