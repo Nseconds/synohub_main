@@ -47,7 +47,7 @@ export function DashboardPage({
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
-      className="space-y-6 max-w-5xl mx-auto"
+      className="space-y-6 w-full"
     >
       <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm space-y-4">
         <div>
