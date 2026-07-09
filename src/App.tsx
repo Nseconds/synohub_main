@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Sparkles, ClipboardList } from "lucide-react";
+import { LayoutDashboard, Plus, Sparkles, ClipboardList } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { updateCustomer } from "./frontend/api/customerApi";
 import { fetchDashboardData } from "./frontend/api/dashboardApi";
@@ -13,6 +13,7 @@ import { NotificationToast } from "./frontend/components/NotificationToast";
 import { Sidebar } from "./frontend/components/Sidebar";
 import { IMPLEMENTATION_TYPES, LEAD_STATUSES, PAYMENT_OPTIONS, REGIONS, REQUESTED_PEOPLE, SALES_PEOPLE, SALES_TYPES, SOURCES, TICKET_STATUSES } from "./frontend/constants/options";
 import { AiPage } from "./frontend/pages/AiPage";
+import { DashboardPage } from "./frontend/pages/DashboardPage";
 import { LeadFormPage } from "./frontend/pages/LeadFormPage";
 import { LoginPage } from "./frontend/pages/LoginPage";
 import type { Customer, Registration, ServiceTicket } from "./frontend/types";
@@ -52,7 +53,7 @@ export default function App() {
     return null;
   });
 
-  const [activeTab, setActiveTab ] = useState<string>("existing-form");
+  const [activeTab, setActiveTab ] = useState<string>("overview");
 
   const [requestedPeopleList, setRequestedPeopleList] = useState<string[]>(REQUESTED_PEOPLE);
   const [defaultRequestedPerson, setDefaultRequestedPerson] = useState<string>("");
@@ -373,6 +374,7 @@ export default function App() {
 
 
   const navItems = [
+    { id: "overview", label: "Dashboard", icon: LayoutDashboard },
     { id: "existing-form", label: "Existing Form", icon: ClipboardList },
     { id: "ai", label: "SynoAI Chat", icon: Sparkles },
   ].filter(item => !!user);
@@ -383,7 +385,7 @@ export default function App() {
         onLoginSuccess={(loggedUser) => {
           localStorage.setItem("synohub-user", JSON.stringify(loggedUser));
           setUser(loggedUser);
-          setActiveTab("existing-form");
+          setActiveTab("overview");
           showToast(`Welcome back, ${loggedUser.name}!`);
         }} 
       />
@@ -575,6 +577,18 @@ export default function App() {
                </form>
             </Modal>
 
+            {activeTab === "overview" && (
+              <DashboardPage
+                registrations={data?.registrations || []}
+                showAllFeed={showAllFeed}
+                onSelectLead={(leadId) => {
+                  setSelectedLeadId(leadId);
+                  setActiveTab("existing-form");
+                }}
+                onToggleShowAllFeed={() => setShowAllFeed(!showAllFeed)}
+              />
+            )}
+
             {activeTab === "existing-form" && (
               <LeadFormPage
                 mode="existing"
@@ -582,7 +596,7 @@ export default function App() {
                 setLeadForm={setLeadForm}
                 onSubmit={handleLeadSubmit}
                 onResetLeadForm={resetLeadForm}
-                onCloseExisting={() => setSelectedLeadId(null)}
+                onCloseExisting={() => setActiveTab("overview")}
                 searchTerm={searchTerm}
                 filteredCustomers={filteredCustomers}
                 registrations={data?.registrations || []}
