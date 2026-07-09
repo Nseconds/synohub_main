@@ -11,9 +11,14 @@ import {
   type ForcedServiceRequestFields,
   type ForcedServiceRequestResult,
 } from "../services/serviceRequestService";
-import { extractRegionName, normalizeQueryText } from "./aiUtils";
+import {
+  extractRegionName,
+  normalizeQueryText,
+  extractRecordTriggerJson,
+  findRecordTrigger,
+  removeRecordTrigger
+} from "./aiUtils";
 import { parseForcedServiceRequest } from "./serviceTemplateParser";
-import { extractRecordTriggerJson, findRecordTrigger, removeRecordTrigger } from "./saveRecordParser";
 
 function mapInputToSchema(input: any): any {
   if (!input || typeof input !== "object") return {};
