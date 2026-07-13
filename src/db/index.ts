@@ -40,3 +40,20 @@ export const pool = mysql.createPool(poolConfig);
 export const db = drizzle(pool, { schema, mode: 'default' });
 
 export const isFallbackEnabled = false;
+
+export async function getNextId(tableName: string, idColumnName: string): Promise<number> {
+  const [rows]: any = await pool.query(`SELECT MAX(${idColumnName}) as maxId FROM ${tableName}`);
+  const maxId = rows[0]?.maxId;
+  return (maxId !== null && maxId !== undefined && maxId !== '') ? Number(maxId) + 1 : 1000;
+}
+
+export async function resolveUserIdByName(name: string): Promise<number> {
+  if (!name) return 0;
+  const trimmed = name.trim().toLowerCase();
+  if (trimmed === "guest" || trimmed === "system") return 0;
+  const [rows]: any = await pool.query(
+    "SELECT user_id FROM tbl_users WHERE LOWER(user_name) = ? OR LOWER(user_username) = ? LIMIT 1",
+    [trimmed, trimmed]
+  );
+  return rows[0]?.user_id || 0;
+}

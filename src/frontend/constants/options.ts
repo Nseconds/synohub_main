@@ -19,3 +19,5 @@ export const PAYMENT_OPTIONS = ["Applicable", "Not Applicable"];
 export const INVOICE_STATUSES = ["Not Invoiced", "Invoiced"];
 
 export const PAYMENT_STATUSES = ["Not Paid", "Paid"];
+
+export const LEVEL_1_ASSIGNEES = ["Athul", "Faizal", "Midhun", "Mohamed Musthafa", "Naseeb", "Nisam", "Rasick", "Shamnad", "Shyamjith", "Vaishakh Tech"];

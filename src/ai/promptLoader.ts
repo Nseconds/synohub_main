@@ -29,8 +29,10 @@ export function buildChatSystemInstruction(args: {
   userName: string;
   aiMode?: string;
 }): string {
+  const userContext = `ACTIVE USER: ${args.userName} (Role: ${args.userRole})`;
   return [
     args.prompts.chat_assistant,
+    userContext,
     args.dbContextStr,
   ].map(part => String(part || "").trim()).filter(Boolean).join("\n\n");
 }

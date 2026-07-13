@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { db } from "../db";
+import { db, getNextId, resolveUserIdByName } from "../db";
 import { customers, serviceRequests } from "../db/schema";
 import type { AuthUser } from "../auth/users";
 import { saveLocalSalesplusEntry } from "./salesplusService";
@@ -147,7 +147,7 @@ export async function saveForcedServiceRequestFields(
   options: ForcedServiceRequestSaveOptions = {},
 ): Promise<ForcedServiceRequestResult> {
   const fields: ForcedServiceRequestFields = { ...parsed };
-  if (authUser.role === "staff" && authUser.name.trim()) {
+  if ((authUser.role === "staff" || authUser.role === "admin") && authUser.name.trim()) {
     fields.requestedPerson = authUser.name.trim();
   }
   validateForcedServiceRequestFields(fields);
@@ -217,7 +217,10 @@ export async function saveForcedServiceRequestFields(
   const region = resolveRegionName(fields.location) || fields.location;
 
   if (!matchedCustomer) {
+    const nextCustId = await getNextId("customers", "id");
+    const creatorId = await resolveUserIdByName(authUser.name || "guest");
     const [customerResult]: any = await db.insert(customers).values({
+      id: nextCustId,
       name: fields.customerName,
       contactName: fields.contactName,
       phone: fields.phone,
@@ -225,9 +228,9 @@ export async function saveForcedServiceRequestFields(
       region,
       implementationType: fields.implementationType,
       vehicleCount: fields.quantity,
-      createdBy: authUser.name.trim() || "guest",
+      createdBy: String(creatorId),
     });
-    customerId = Number(customerResult.insertId || 0);
+    customerId = nextCustId;
     customerCreated = true;
   }
 
@@ -238,36 +241,30 @@ export async function saveForcedServiceRequestFields(
     fields.driverNumber ? `Driver Number: ${fields.driverNumber}` : "",
   ].filter(Boolean).join("\n");
 
+  const nextServiceId = await getNextId("tbl_customer_services_beta", "customer_service_id");
   const serviceInsert = {
+    id: nextServiceId,
+    customerId,
     createdAt: new Date().toISOString().substring(0, 10),
-    source: "WhatsApp",
+    createdBy: authUser.name.trim() || "guest",
     region,
-    status: "New Lead",
+    status: "new",
     implementationType: fields.implementationType,
     customerName,
     contactName: fields.contactName,
     phone: fields.phone,
     email: fields.email,
     newQty: fields.quantity,
-    accessories: fields.accessories,
+    accessories: fields.accessories || notes || "",
     requestedPerson: fields.requestedPerson,
     salesPerson: fields.requestedPerson,
-    salesType,
-    comment: fields.issueDescription,
-    issueDescription: fields.issueDescription,
-    location: fields.location,
-    paymentStatus: fields.paymentStatus,
     amount: fields.amount,
-    projectValue: fields.amount,
-    priceDetails: fields.amount,
-    vehicleDetails: fields.vehiclePlate,
-    notes,
-    jobStatus: "Pending",
-    createdBy: authUser.name.trim() || "guest",
+    issueDescription: fields.issueDescription,
+    paymentStatus: fields.paymentStatus,
   };
 
   const [serviceResult]: any = await db.insert(serviceRequests).values(serviceInsert);
-  const serviceRequestId = Number(serviceResult.insertId || 0);
+  const serviceRequestId = nextServiceId;
 
   let salesplusSaved = false;
   try {
@@ -325,7 +322,7 @@ export async function createLeadRegistration(body: any, authUser: AuthUser) {
   payload.region = normalizeLocationName(payload.region);
 
   let reqPerson = payload.requestedPerson || "";
-  if (userRole === "staff" && userName) {
+  if ((userRole === "staff" || userRole === "admin") && userName) {
     reqPerson = userName;
   }
   const resolvedPerson = reqPerson || payload.salesPerson || "";
@@ -334,7 +331,13 @@ export async function createLeadRegistration(body: any, authUser: AuthUser) {
   }
   const leadSalesPerson = payload.salesPerson || resolvedPerson;
 
+  const nextId = await getNextId("tbl_customer_services_beta", "customer_service_id");
+  const creatorId = await resolveUserIdByName(payload.source || userName || "guest");
+  const requestedPersonId = await resolveUserIdByName(resolvedPerson);
+  const salesPersonId = await resolveUserIdByName(leadSalesPerson);
   const [result]: any = await db.insert(serviceRequests).values({
+    id: nextId,
+    customerId: 0,
     customerName: payload.customerName || "",
     contactName: payload.contactName || "",
     phone: payload.phone || "",
@@ -343,28 +346,21 @@ export async function createLeadRegistration(body: any, authUser: AuthUser) {
     address: payload.address || "",
     mapLink: payload.mapLink || "",
     coordinates: payload.coordinates || "",
-    source: payload.source || "",
+    createdBy: String(creatorId),
     status: payload.status || "New Lead",
     implementationType: payload.implementationType || "",
-    salesPerson: leadSalesPerson,
-    salesType: payload.salesType || "",
-    requestedPerson: resolvedPerson,
-    comment: payload.comment || "",
-    projectValue: payload.projectValue || "",
+    salesPerson: String(salesPersonId),
+    requestedPerson: String(requestedPersonId),
+    issueDescription: payload.comment || "",
+    amount: payload.projectValue || "",
     priceDetails: payload.priceDetails || "",
     accessories: payload.accessories || "",
-    newQty: payload.newQty,
-    migrateQty: payload.migrateQty,
-    tradingQty: payload.tradingQty,
-    serviceQty: payload.serviceQty,
-    otherQty: payload.otherQty,
-    jobStatus: "Pending",
+    newQty: (payload.newQty || 0) + (payload.migrateQty || 0) + (payload.tradingQty || 0) + (payload.serviceQty || 0) + (payload.otherQty || 0),
     createdAt: new Date().toISOString().substring(0, 10),
-    createdBy: userName || "guest"
   });
 
   try {
-    await saveLocalSalesplusEntry({ ...body, ...payload, requestedPerson: resolvedPerson }, result.insertId, resolvedPerson);
+    await saveLocalSalesplusEntry({ ...body, ...payload, requestedPerson: resolvedPerson }, nextId, resolvedPerson);
   } catch (salesplusErr) {
     console.error("Failed to save local Salesplus entry:", salesplusErr);
   }
@@ -391,7 +387,7 @@ export async function createServiceTicket(body: any, authUser: AuthUser) {
   payload.region = normalizeLocationName(payload.region);
 
   let reqPerson = payload.requestedPerson || "";
-  if (userRole === "staff" && userName) {
+  if ((userRole === "staff" || userRole === "admin") && userName) {
     reqPerson = userName;
   }
   const salesPerson = payload.assignee || (payload as any).salesPerson || reqPerson;
@@ -399,20 +395,31 @@ export async function createServiceTicket(body: any, authUser: AuthUser) {
     throw Object.assign(new Error("Missing required service request fields: Requested Person."), { statusCode: 400 });
   }
 
+  const nextId = await getNextId("tbl_customer_services_beta", "customer_service_id");
+  const creatorId = await resolveUserIdByName(userName || "guest");
+  const requestedPersonId = await resolveUserIdByName(reqPerson || salesPerson);
+  const salesPersonId = await resolveUserIdByName(salesPerson);
   const [result]: any = await db.insert(serviceRequests).values({
+    id: nextId,
+    customerId: (payload as any).customerId || 0,
     customerName: payload.customerName || "",
+    contactName: (payload as any).contactName || "",
+    phone: (payload as any).phone || "",
+    email: (payload as any).email || "",
+    address: (payload as any).address || "",
+    mapLink: (payload as any).mapLink || "",
+    accessories: (payload as any).accessories || "",
     issueDescription: payload.description || "",
-    jobStatus: payload.status || "Pending",
-    newQty: payload.quantity,
-    requestedPerson: reqPerson || salesPerson,
+    status: payload.status || "Pending",
+    newQty: payload.quantity || 1,
+    requestedPerson: String(requestedPersonId),
     paymentStatus: payload.payment || "",
     amount: payload.amount || "",
-    salesPerson,
-    location: payload.location || "",
+    salesPerson: String(salesPersonId),
     region: payload.location || payload.region || "",
-    status: "New Lead",
     createdAt: new Date().toISOString().substring(0, 10),
-    createdBy: userName || "guest"
+    createdBy: String(creatorId),
+    jobCreated: 0,
   });
 
   return result;
@@ -423,6 +430,9 @@ export async function updateLeadRegistration(recordId: number, body: any) {
   payload.region = normalizeLocationName(payload.region);
   const custName = payload.customerName;
 
+  const creatorId = await resolveUserIdByName(payload.source);
+  const salesPersonId = await resolveUserIdByName(payload.salesPerson);
+  const requestedPersonId = await resolveUserIdByName(payload.requestedPerson);
   await db.update(serviceRequests).set({
     customerName: custName,
     contactName: payload.contactName,
@@ -432,21 +442,16 @@ export async function updateLeadRegistration(recordId: number, body: any) {
     address: payload.address,
     mapLink: payload.mapLink,
     coordinates: payload.coordinates,
-    source: payload.source,
+    createdBy: String(creatorId),
     status: payload.status,
     implementationType: payload.implementationType,
-    salesPerson: payload.salesPerson,
-    salesType: payload.salesType,
-    requestedPerson: payload.requestedPerson,
-    comment: payload.comment,
-    projectValue: payload.projectValue,
+    salesPerson: String(salesPersonId),
+    requestedPerson: String(requestedPersonId),
+    issueDescription: payload.comment,
+    amount: payload.projectValue,
     priceDetails: payload.priceDetails,
     accessories: payload.accessories,
-    newQty: payload.newQty,
-    migrateQty: payload.migrateQty,
-    tradingQty: payload.tradingQty,
-    serviceQty: payload.serviceQty,
-    otherQty: payload.otherQty
+    newQty: (payload.newQty || 0) + (payload.migrateQty || 0) + (payload.tradingQty || 0) + (payload.serviceQty || 0) + (payload.otherQty || 0),
   }).where(eq(serviceRequests.id, recordId));
 
   try {
@@ -469,16 +474,17 @@ export async function updateServiceTicket(recordId: number, body: any) {
   const payload = normalizeServiceTicketPayload(body);
   payload.location = normalizeLocationName(payload.location);
   payload.region = normalizeLocationName(payload.region);
+  const requestedPersonId = await resolveUserIdByName(payload.requestedPerson);
+  const salesPersonId = await resolveUserIdByName(payload.assignee);
   await db.update(serviceRequests).set({
     customerName: payload.customerName,
     issueDescription: payload.description,
-    jobStatus: payload.status,
+    status: payload.status,
     newQty: payload.quantity,
-    requestedPerson: payload.requestedPerson,
+    requestedPerson: String(requestedPersonId),
     paymentStatus: payload.payment,
     amount: payload.amount,
-    salesPerson: payload.assignee,
-    location: payload.location,
+    salesPerson: String(salesPersonId),
     region: payload.location || payload.region
   }).where(eq(serviceRequests.id, recordId));
 }

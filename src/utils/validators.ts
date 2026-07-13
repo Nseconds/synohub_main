@@ -13,6 +13,7 @@ export function normalizeLeadPayload(input: Record<string, any>) {
 export function normalizeServiceTicketPayload(input: Record<string, any>) {
   const parsed = ServiceRequestSchema.parse(input);
   return {
+    customerId: input.customerId ? parseInt(String(input.customerId)) : 0,
     customerName: parsed.customerName,
     description: parsed.description || parsed.issueDescription,
     status: parsed.status || parsed.jobStatus,
@@ -23,6 +24,12 @@ export function normalizeServiceTicketPayload(input: Record<string, any>) {
     assignee: parsed.assignee || parsed.salesPerson,
     location: parsed.location,
     region: parsed.region,
+    contactName: input.contactName || "",
+    phone: input.phone || "",
+    email: input.email || "",
+    address: input.address || "",
+    mapLink: input.mapLink || "",
+    accessories: input.accessories || "",
   };
 }
 

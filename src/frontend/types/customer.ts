@@ -7,4 +7,7 @@ export interface Customer {
   region: string;
   implementationType: string;
   vehicleCount: number;
+  customerUsername?: string;
+  locatorPlan?: string;
+  address?: string;
 }

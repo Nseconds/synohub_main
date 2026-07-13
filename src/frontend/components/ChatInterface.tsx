@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { fetchChatHistory, sendChatMessage, sendSafeQuery } from "../api/chatApi";
+import { fetchChatHistory, sendChatMessage } from "../api/chatApi";
 import { REQUESTED_PEOPLE } from "../constants/options";
 import { ChatPage, type CompareProvider, type SafeQueryAiMode } from "../pages/ChatPage";
 import type { Message } from "../types";
-import { isSafeQueryMessage } from "../utils/chatQuery";
 
 interface CurrentUser {
   name: string;
@@ -133,12 +132,11 @@ export const ChatInterface = ({
     const sendScopeKey = chatScopeKey;
 
     try {
-      const useSafeQuery = isSafeQueryMessage(userMsg);
       const payload: any = { message: userMsg, aiMode: "gemini" };
-      if (!useSafeQuery && currentUser?.role === "admin") {
+      if (currentUser?.role === "admin") {
         payload.selectedChatTarget = selectedChatTarget;
       }
-      const res: any = useSafeQuery ? await sendSafeQuery(payload) : await sendChatMessage(payload);
+      const res: any = await sendChatMessage(payload);
       if (activeChatScopeRef.current !== sendScopeKey) return;
       setMessages(prev => [...prev, { role: "assistant", content: res.answer || res.reply, username: messageChannel }]);
       if (res.savedRecord) {

@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { eq, like, or } from "drizzle-orm";
-import { db } from "../db";
+import { db, getNextId } from "../db";
 import { customers, serviceRequests } from "../db/schema";
 import type { AuthUser } from "../auth/users";
 import { SaveRecordSchema } from "../shared/validation/saveRecord";
@@ -40,9 +40,10 @@ function mapInputToSchema(input: any): any {
     }
   };
 
-  assignIfDefined("source", "source", "source");
-  assignIfDefined("region", "region", "region");
-  assignIfDefined("status", "status", "status");
+  assignIfDefined("createdAt", "createdAt", "created_at");
+  assignIfDefined("createdBy", "createdBy", "created_by", "source");
+  assignIfDefined("region", "region", "region", "location");
+  assignIfDefined("status", "status", "status", "jobStatus", "job_status", "salesType", "sales_type");
   assignIfDefined("implementationType", "implementationType", "implementation_type");
   assignIfDefined("customerName", "customerName", "customer_name");
   assignIfDefined("contactName", "contactName", "contact_name");
@@ -52,29 +53,16 @@ function mapInputToSchema(input: any): any {
   assignIfDefined("mapLink", "mapLink", "map_link");
   assignIfDefined("coordinates", "coordinates", "coordinates");
 
-  assignIfDefined("newQty", "newQty", "new_qty", "qty", "quantity");
-  assignIfDefined("migrateQty", "migrateQty", "migrate_qty");
-  assignIfDefined("tradingQty", "tradingQty", "trading_qty");
-  assignIfDefined("serviceQty", "serviceQty", "service_qty");
-  assignIfDefined("otherQty", "otherQty", "other_qty");
-  assignIfDefined("accessories", "accessories", "accessories");
+  assignIfDefined("newQty", "newQty", "new_qty", "qty", "quantity", "migrateQty", "migrate_qty", "tradingQty", "trading_qty", "serviceQty", "service_qty", "otherQty", "other_qty");
+  assignIfDefined("accessories", "accessories", "accessories", "vehicleDetails", "vehicle_details", "notes");
 
   assignIfDefined("requestedPerson", "requestedPerson", "requested_person", "requestedBy", "requested_by", "requested", "assignee");
   assignIfDefined("salesPerson", "salesPerson", "sales_person", "assignee", "requestedPerson", "requested_person", "requestedBy", "requested_by");
-  assignIfDefined("salesType", "salesType", "sales_type");
 
-  assignIfDefined("projectValue", "projectValue", "project_value");
+  assignIfDefined("amount", "amount", "amount", "projectValue", "project_value");
   assignIfDefined("priceDetails", "priceDetails", "price_details");
-  assignIfDefined("comment", "comment", "comment");
-
-  assignIfDefined("issueDescription", "issueDescription", "issue_description", "description");
-  assignIfDefined("location", "location", "location");
+  assignIfDefined("issueDescription", "issueDescription", "issue_description", "description", "comment");
   assignIfDefined("paymentStatus", "paymentStatus", "payment_status", "payment");
-  assignIfDefined("amount", "amount", "amount");
-  assignIfDefined("vehicleDetails", "vehicleDetails", "vehicle_details");
-  assignIfDefined("notes", "notes", "notes");
-  assignIfDefined("jobStatus", "jobStatus", "job_status", "status");
-  assignIfDefined("createdAt", "createdAt", "created_at");
 
   return schema;
 }
@@ -163,7 +151,7 @@ function getMissingForcedServiceFields(fields: ForcedServiceRequestFields, authU
   if (!fields.implementationType || isMissingPerson(fields.implementationType)) missing.push("Implementation Type");
   if (!fields.issueDescription || isMissingPerson(fields.issueDescription)) missing.push("Description");
   if (!fields.location || isMissingPerson(fields.location)) missing.push("Service Location");
-  if (authUser.role !== "staff" && isMissingPerson(fields.requestedPerson)) missing.push("Requested Person");
+  if (authUser.role !== "staff" && authUser.role !== "admin" && isMissingPerson(fields.requestedPerson)) missing.push("Requested Person");
   return missing;
 }
 
@@ -307,15 +295,10 @@ export async function handleAIRecordSave(reply: string, userRole: string = "gues
   const deleteMatch = findRecordTrigger(reply, "DELETE_RECORD");
   if (deleteMatch) {
     try {
-      if (userRole !== "admin") {
-        console.warn(`[Security Alert] Non-admin user "${userName}" tried to delete a record via AI.`);
-        if (userRole === "staff") {
-          return {
-            reply: "Access Denied: Staff users can create and view records but cannot modify or delete existing records. Please contact a Manager or Administrator.",
-          };
-        }
+      if (userRole !== "admin" && userRole !== "staff") {
+        console.warn(`[Security Alert] Non-admin/staff user "${userName}" tried to delete a record via AI.`);
         return {
-          reply: removeRecordTrigger(reply, deleteMatch) + "\n\n(Authorization Warning: Access Denied. Only system administrators can delete records.)",
+          reply: removeRecordTrigger(reply, deleteMatch) + "\n\n(Authorization Warning: Access Denied. Only system administrators or staff can delete records.)",
         };
       }
 
@@ -358,12 +341,7 @@ export async function handleAIRecordSave(reply: string, userRole: string = "gues
       const id = parseInt(record.id);
       console.log(`[AI Auto-Update] Detected record update: ${record.type}, ID: ${id}`);
 
-      if (userRole === "staff") {
-        console.warn(`[Security Guard] Staff member "${userName}" attempted to edit record #${id} via SynoAI.`);
-        return {
-          reply: "Access Denied: Staff users can create and view records but cannot modify or delete existing records. Please contact a Manager or Administrator.",
-        };
-      }
+      // Staff and Admin are both allowed to edit records
 
       if (record.type === "registration") {
         const mappedData = mapInputToSchema(record.data);
@@ -378,9 +356,9 @@ export async function handleAIRecordSave(reply: string, userRole: string = "gues
           reply: removeRecordTrigger(reply, updateMatch) + `\n\n(CRM: Service ticket #${id} updated successfully.)`,
         };
       } else if (record.type === "customer") {
-        if (userRole !== "admin") {
+        if (userRole !== "admin" && userRole !== "staff") {
           return {
-            reply: removeRecordTrigger(reply, updateMatch) + "\n\n(Authorization Warning: Access Denied. Only system administrators can edit customer accounts.)",
+            reply: removeRecordTrigger(reply, updateMatch) + "\n\n(Authorization Warning: Access Denied. Only system administrators or staff can edit customer accounts.)",
           };
         }
         const mappedCustomer: any = {};
@@ -476,10 +454,13 @@ export async function handleAIRecordSave(reply: string, userRole: string = "gues
         };
       }
 
+      const nextId = await getNextId("tbl_customer_services_beta", "customer_service_id");
       const [res]: any = await db.insert(serviceRequests).values({
+        id: nextId,
+        customerId: mapped.customerId || 0,
         customerName: mapped.customerName || "Unknown",
         issueDescription: mapped.issueDescription || "",
-        jobStatus: mapped.jobStatus || "New",
+        status: mapped.status || "New",
         newQty: mapped.newQty || 1,
         requestedPerson: mapped.requestedPerson || "",
         paymentStatus: mapped.paymentStatus || "",
@@ -489,7 +470,7 @@ export async function handleAIRecordSave(reply: string, userRole: string = "gues
       });
       return {
         reply: cleanVisibleSavedRecordReply(removeRecordTrigger(reply, saveMatch)) + `\n\n(CRM: Service ticket ${ticketId} created successfully.)`,
-        savedRecord: { ...record, ...mapped, id: res.insertId, ticketId },
+        savedRecord: { ...record, ...mapped, id: nextId, ticketId },
       };
     }
     return { reply: cleanVisibleSavedRecordReply(removeRecordTrigger(reply, saveMatch)) };

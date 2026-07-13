@@ -3,7 +3,7 @@ import { LayoutDashboard, Plus, Sparkles, ClipboardList } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { updateCustomer } from "./frontend/api/customerApi";
 import { fetchDashboardData } from "./frontend/api/dashboardApi";
-import { createLead, updateLead, updateServiceRequest } from "./frontend/api/serviceRequestApi";
+import { createLead, updateLead, updateServiceRequest, createServiceRequest } from "./frontend/api/serviceRequestApi";
 import { AppBoundary } from "./frontend/components/AppBoundary";
 import { AppLayout } from "./frontend/components/AppLayout";
 import { EditModal } from "./frontend/components/EditModal";
@@ -11,10 +11,10 @@ import { Header } from "./frontend/components/Header";
 import { Modal } from "./frontend/components/Modal";
 import { NotificationToast } from "./frontend/components/NotificationToast";
 import { Sidebar } from "./frontend/components/Sidebar";
-import { IMPLEMENTATION_TYPES, LEAD_STATUSES, PAYMENT_OPTIONS, REGIONS, REQUESTED_PEOPLE, SALES_PEOPLE, SALES_TYPES, SOURCES, TICKET_STATUSES } from "./frontend/constants/options";
+import { IMPLEMENTATION_TYPES, LEAD_STATUSES, PAYMENT_OPTIONS, REGIONS, REQUESTED_PEOPLE, SALES_PEOPLE, SALES_TYPES, SOURCES, TICKET_STATUSES, LEVEL_1_ASSIGNEES } from "./frontend/constants/options";
 import { AiPage } from "./frontend/pages/AiPage";
 import { DashboardPage } from "./frontend/pages/DashboardPage";
-import { LeadFormPage } from "./frontend/pages/LeadFormPage";
+import { AddServicePage } from "./frontend/pages/AddServicePage";
 import { LoginPage } from "./frontend/pages/LoginPage";
 import { CustomersPage } from "./frontend/pages/CustomersPage";
 import type { Customer, Registration, ServiceTicket } from "./frontend/types";
@@ -75,6 +75,7 @@ export default function App() {
   const [dbSearch, setDbSearch] = useState("");
   const [dbRegion, setDbRegion] = useState("All");
   const [editingItem, setEditingItem] = useState<{ type: 'lead' | 'service' | 'customer', data: any } | null>(null);
+  const [preselectedCustomer, setPreselectedCustomer] = useState<Customer | null>(null);
   
   // Custom states for existing lead select and visual notifications
   const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
@@ -154,7 +155,7 @@ export default function App() {
   // Synchronize authenticated user credentials to form defaults
   useEffect(() => {
     if (user) {
-      if (user.role === "staff") {
+      if (user.role === "staff" || user.role === "admin") {
         setDefaultRequestedPerson(user.name);
         setLeadForm(prev => ({ ...prev, requestedPerson: user.name }));
       } else {
@@ -167,7 +168,7 @@ export default function App() {
   useEffect(() => {
     const handleAuthExpired = () => {
       setUser(null);
-      setActiveTab("new-form");
+      setActiveTab("overview");
       setLoading(false);
     };
     window.addEventListener("synohub-auth-expired", handleAuthExpired);
@@ -376,7 +377,7 @@ export default function App() {
 
   const navItems = [
     { id: "overview", label: "Dashboard", icon: LayoutDashboard },
-    { id: "existing-form", label: "Existing Form", icon: ClipboardList },
+    { id: "add-service", label: "Add Service", icon: Plus },
     { id: "ai", label: "SynoAI Chat", icon: Sparkles },
   ].filter(item => !!user);
 
@@ -586,9 +587,9 @@ export default function App() {
                   registrations={data?.registrations || []}
                   actionLabel="Select Customer"
                   onSelectCustomer={(cust) => {
-                    handleSelectCustomer(cust);
+                    setPreselectedCustomer(cust);
                     setSearchTerm("");
-                    setActiveTab("existing-form");
+                    setActiveTab("add-service");
                   }}
                 />
               </div>
@@ -599,39 +600,34 @@ export default function App() {
                     registrations={data?.registrations || []}
                     showAllFeed={showAllFeed}
                     onSelectLead={(leadId) => {
-                      setSelectedLeadId(leadId);
-                      setActiveTab("existing-form");
+                      const selectedReg = data.registrations.find(r => r.id === leadId);
+                      if (selectedReg) {
+                        setEditingItem({ type: 'lead', data: selectedReg });
+                      }
                     }}
                     onToggleShowAllFeed={() => setShowAllFeed(!showAllFeed)}
                   />
                 )}
 
-                {activeTab === "existing-form" && (
-                  <LeadFormPage
-                    mode="existing"
-                    leadForm={leadForm}
-                    setLeadForm={setLeadForm}
-                    onSubmit={handleLeadSubmit}
-                    onResetLeadForm={resetLeadForm}
-                    onCloseExisting={() => setActiveTab("overview")}
-                    searchTerm={searchTerm}
-                    filteredCustomers={filteredCustomers}
-                    registrations={data?.registrations || []}
+                {activeTab === "add-service" && (
+                  <AddServicePage
                     customers={data?.customers || []}
-                    onSelectCustomer={handleSelectCustomer}
-                    showSuggestions={showSuggestions}
-                    setShowSuggestions={setShowSuggestions}
-                    showExistingSuggestions={showExistingSuggestions}
-                    setShowExistingSuggestions={setShowExistingSuggestions}
-                    selectedLeadId={selectedLeadId}
-                    user={user}
-                    sources={SOURCES}
-                    regions={REGIONS}
-                    leadStatuses={LEAD_STATUSES}
-                    implementationTypes={IMPLEMENTATION_TYPES}
-                    salesPeople={SALES_PEOPLE}
-                    salesTypes={SALES_TYPES}
+                    level1Assignees={LEVEL_1_ASSIGNEES}
                     requestedPeopleList={requestedPeopleList}
+                    preselectedCustomer={preselectedCustomer}
+                    onClearPreselected={() => setPreselectedCustomer(null)}
+                    onSubmit={async (payload) => {
+                      try {
+                        await createServiceRequest(payload);
+                        showToast("Service ticket created successfully!");
+                        setActiveTab("overview");
+                        fetchData();
+                      } catch (err: any) {
+                        const message = err.response?.data?.error || err.message || "Failed to create service ticket";
+                        showToast(message, "error");
+                      }
+                    }}
+                    onClose={() => setActiveTab("overview")}
                   />
                 )}
 

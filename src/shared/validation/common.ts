@@ -1,7 +1,11 @@
 import { z } from "zod";
 
 export const emptyToUndefined = (value: unknown) => {
-  if (typeof value !== "string") return value;
+  if (value === null || value === undefined) return undefined;
+  if (typeof value !== "string") {
+    const str = String(value).trim();
+    return str === "" ? undefined : str;
+  }
   const trimmed = value.trim();
   return trimmed === "" ? undefined : trimmed;
 };

@@ -3,7 +3,7 @@ import { desc, eq, like, or } from "drizzle-orm";
 import { getAuthUser, requireAuth, requireRoles } from "../auth/middleware";
 import { normalizeUserName } from "../auth/users";
 import { db } from "../db";
-import { customers, serviceRequests } from "../db/schema";
+import { customers, customersLocator, serviceRequests } from "../db/schema";
 import { CustomerSchema } from "../shared/validation/customer";
 import { QuerySchema } from "../shared/validation/query";
 
@@ -22,9 +22,29 @@ export function registerCustomerRoutes(app: Express) {
       const userRole = authUser.role;
       const userName = normalizeUserName(authUser.name);
       const { search: q } = QuerySchema.parse(req.query);
+
+      const baseQuery = db
+        .select({
+          id: customers.id,
+          name: customers.name,
+          traccarId: customers.traccarId,
+          contactName: customers.contactName,
+          phone: customers.phone,
+          email: customers.email,
+          region: customers.region,
+          implementationType: customers.implementationType,
+          vehicleCount: customers.vehicleCount,
+          createdBy: customers.createdBy,
+          address: customers.address,
+          customerUsername: customersLocator.customerUsername,
+          locatorPlan: customersLocator.locatorPlan,
+        })
+        .from(customers)
+        .leftJoin(customersLocator, eq(customers.name, customersLocator.customerName));
+
       const rawResults = q
-        ? await db.select().from(customers).where(or(like(customers.name, `%${q}%`), like(customers.contactName, `%${q}%`)))
-        : await db.select().from(customers);
+        ? await baseQuery.where(or(like(customers.name, `%${q}%`), like(customers.contactName, `%${q}%`)))
+        : await baseQuery;
 
       const results = rawResults;
       res.json({ results, total: results.length });

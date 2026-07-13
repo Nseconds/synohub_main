@@ -57,7 +57,7 @@ function isGenericTicketCreationPrompt(input: string): boolean {
     extractEmail(input) ||
     extractRegionName(input) ||
     /\b(customer|company|client)\s+[:\w]/i.test(input) ||
-    /\bfor\s+[A-Z0-9][A-Z0-9 .&-]{2,}\b/.test(input);
+    /\bfor\s+[A-Z0-9][A-Z0-9 .&-]{2,}\b/i.test(input);
 
   return !hasConcreteDetails;
 }
@@ -75,7 +75,7 @@ function formatGenericTicketCreationPrompt(userRole: string, userName: string): 
     "- Service Location:",
   ];
 
-  if (userRole === "staff" && userName) {
+  if ((userRole === "staff" || userRole === "admin") && userName) {
     return lines.join("\n");
   } else {
     lines.push("- Requested Person:");
@@ -188,9 +188,21 @@ export async function startServer() {
       }
 
       const persistedHistory = await getRecentChatMessages(chatChannel, 12);
-      const chatHistory = persistedHistory
-        .reverse()
-        .map((h: any) => ({ role: h.role, content: h.content }));
+      let chatHistory: { role: string; content: string }[] = [];
+      
+      if (persistedHistory.length > 0) {
+        const lastMsgTime = persistedHistory[0].timestamp;
+        const timeDiffMs = lastMsgTime ? (Date.now() - new Date(lastMsgTime).getTime()) : 0;
+        const sessionTimeoutMs = 30 * 60 * 1000; // 30 minutes
+        if (timeDiffMs < sessionTimeoutMs) {
+          chatHistory = persistedHistory
+            .slice() // avoid mutating original array if needed, but reverse() mutates in place
+            .reverse()
+            .map((h: any) => ({ role: h.role, content: h.content }));
+        } else {
+          console.log(`[AI Chat] Session expired (last message was ${(timeDiffMs / (1000 * 60)).toFixed(1)} mins ago). Starting fresh context.`);
+        }
+      }
 
       // Save user message (partitioned by username)
       await saveChatMessage("user", message, chatChannel);

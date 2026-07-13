@@ -4,15 +4,12 @@ import { eq, like, or } from "drizzle-orm";
 import { messages } from "../db/schema";
 
 export function resolveChatIdentity(authUser: AuthUser, requestedTarget?: unknown) {
-  const normalizedGuestName = normalizeUserName(authUser.name);
   const fallback = {
     role: authUser.role,
-    name: authUser.role === "guest" ? normalizedGuestName : authUser.name.trim(),
+    name: authUser.name.trim(),
     channel: authUser.role === "admin"
       ? "admin"
-      : authUser.role === "staff"
-        ? `staff:${authUser.name.trim()}`
-        : `guest:${normalizedGuestName}`,
+      : `staff:${authUser.name.trim()}`,
   };
 
   if (typeof requestedTarget === "string") {
@@ -28,7 +25,6 @@ export function resolveChatIdentity(authUser: AuthUser, requestedTarget?: unknow
 
   const target = requestedTarget.trim();
   if (target === "admin") return { role: "admin" as const, name: authUser.name.trim(), channel: "admin" };
-  if (target === "guest") return { role: "guest" as const, name: "guest", channel: "guest" };
 
   if (target.toLowerCase().startsWith("staff:")) {
     const rawStaffName = target.slice("staff:".length).trim();

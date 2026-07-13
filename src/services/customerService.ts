@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { db } from "../db";
+import { db, getNextId, resolveUserIdByName } from "../db";
 import { customers } from "../db/schema";
 
 export type CustomerSyncResult =
@@ -24,7 +24,10 @@ export async function syncRegistrationCustomer(input: any, userName: string, def
 
   if (existing.length === 0) {
     const vehicleCount = defaultQuantity > 0 ? totalQty : (totalQty > 0 ? totalQty : 1);
+    const nextCustId = await getNextId("customers", "id");
+    const creatorId = await resolveUserIdByName(userName || "guest");
     await db.insert(customers).values({
+      id: nextCustId,
       name: customerName,
       contactName: input.contactName || input.contact_name || "",
       phone: input.phone || "",
@@ -32,7 +35,7 @@ export async function syncRegistrationCustomer(input: any, userName: string, def
       region: input.region || "",
       implementationType: input.implementationType || input.implementation_type || "",
       vehicleCount,
-      createdBy: userName || "guest",
+      createdBy: String(creatorId),
     });
     return { action: "created", customerName, vehicleCount };
   }
@@ -60,7 +63,9 @@ export async function syncLeadEditCustomer(input: any): Promise<CustomerSyncResu
 
   if (existing.length === 0) {
     const vehicleCount = totalQty > 0 ? totalQty : 1;
+    const nextCustId = await getNextId("customers", "id");
     await db.insert(customers).values({
+      id: nextCustId,
       name: customerName,
       contactName: input.contactName || input.contact_name || "",
       phone: input.phone || "",

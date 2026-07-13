@@ -1,12 +1,31 @@
 import { db } from "../db";
-import { customers, serviceRequests, users } from "../db/schema";
+import { customers, customersLocator, serviceRequests, users } from "../db/schema";
 import { normalizeUserName, type AuthUser } from "../auth/users";
+import { eq } from "drizzle-orm";
 
 export async function getDashboardData(authUser: AuthUser) {
   const userRole = authUser.role;
   const userName = normalizeUserName(authUser.name);
 
-  const allCustomers = await db.select().from(customers);
+  const allCustomers = await db
+    .select({
+      id: customers.id,
+      name: customers.name,
+      traccarId: customers.traccarId,
+      contactName: customers.contactName,
+      phone: customers.phone,
+      email: customers.email,
+      region: customers.region,
+      implementationType: customers.implementationType,
+      vehicleCount: customers.vehicleCount,
+      createdBy: customers.createdBy,
+      address: customers.address,
+      customerUsername: customersLocator.customerUsername,
+      locatorPlan: customersLocator.locatorPlan,
+    })
+    .from(customers)
+    .leftJoin(customersLocator, eq(customers.name, customersLocator.customerName));
+
   let allRequests = await db.select().from(serviceRequests);
   const allUsers = await db.select().from(users);
 
@@ -33,7 +52,7 @@ export async function getDashboardData(authUser: AuthUser) {
       const createdByVal = (c.createdBy || "").trim().toLowerCase();
       return createdByVal === userName;
     });
-  } else if (userRole === "staff" && userName) {
+  } else if (false && userRole === "staff" && userName) {
     allRequests = allRequests.filter(r => {
       const reqPerson = (r.requestedPerson || "").trim().toLowerCase();
       const salesPerson = (r.salesPerson || "").trim().toLowerCase();
@@ -75,14 +94,14 @@ export async function getDashboardData(authUser: AuthUser) {
       address: r.address || "",
       mapLink: r.mapLink || "",
       coordinates: r.coordinates || "",
-      source: resolveUserName(r.source),
+      source: resolveUserName(r.createdBy),
       status: r.status || "New Lead",
       implementationType: r.implementationType || "",
       salesPerson: resolveUserName(r.salesPerson),
-      salesType: r.salesType || "",
+      salesType: r.status || "",
       requestedPerson: resolveUserName(r.requestedPerson),
-      comment: r.comment || "",
-      projectValue: r.projectValue ? r.projectValue.toString() : "",
+      comment: r.issueDescription || "",
+      projectValue: r.amount ? r.amount.toString() : "",
       priceDetails: r.priceDetails || "",
       accessories: r.accessories || "",
       newQty,
@@ -101,8 +120,8 @@ export async function getDashboardData(authUser: AuthUser) {
       id: s.id,
       ticketId: s.id ? ("TKT-" + s.id) : "",
       customerName: s.customerName || "",
-      description: s.issueDescription || s.notes || s.comment || "",
-      status: s.jobStatus || "Pending",
+      description: s.issueDescription || "",
+      status: s.status || "Pending",
       quantity: realQty,
       requestedPerson: resolveUserName(s.requestedPerson),
       payment: s.paymentStatus || "",
@@ -111,7 +130,7 @@ export async function getDashboardData(authUser: AuthUser) {
       amount: s.amount ? s.amount.toString() : "",
       assignee: resolveUserName(s.salesPerson) || resolveUserName(s.requestedPerson) || "",
       createdAt: s.createdAt,
-      location: s.location || s.region || ""
+      location: s.region || ""
     };
   });
 

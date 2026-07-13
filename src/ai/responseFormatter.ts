@@ -55,14 +55,14 @@ export function cleanLocalChatReply(text: string): string {
 }
 
 export function applyStaffRequestedPersonDefault(text: string, userRole: string, userName: string): string {
-  if (userRole !== "staff" || !userName) return text;
+  if (userRole !== "staff" && userRole !== "admin" || !userName) return text;
   const escapedName = userName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   if (new RegExp(`Requested Person\\s*:\\s*${escapedName}\\b`, "i").test(text)) {
     return text;
   }
   return text
-    .replace(/^(\s*[-•]?\s*Requested\s+(?:Person|by)\s*:\s*)$/gim, `$1${userName} (from staff login)`)
-    .replace(/^(\s*[-•]?\s*Requested\s+(?:Person|by)\s*:\s*)(?:N\/A|TBD|Unknown|Not provided|Use the logged-in staff member when this is a staff session\.?)\s*$/gim, `$1${userName} (from staff login)`);
+    .replace(/^(\s*[-•]?\s*Requested\s+(?:Person|by)\s*:\s*)$/gim, `$1${userName} (from session)`)
+    .replace(/^(\s*[-•]?\s*Requested\s+(?:Person|by)\s*:\s*)(?:N\/A|TBD|Unknown|Not provided|Use the logged-in staff member when this is a staff session\.?)\s*$/gim, `$1${userName} (from session)`);
 }
 
 export function sanitizeProviderChatHistory(chatHistory: any[]): Array<{ role: "user" | "assistant"; content: string }> {

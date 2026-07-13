@@ -7,13 +7,6 @@ export function sendChatMessage(body: unknown) {
   });
 }
 
-export function sendSafeQuery(body: unknown) {
-  return apiRequest("/api/chat/query", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
-
 export function fetchChatHistory(params: { target?: string; aiMode?: string; cacheBust?: number }) {
   const query = new URLSearchParams();
   if (params.target) query.set("target", params.target);

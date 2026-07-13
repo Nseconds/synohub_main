@@ -13,6 +13,9 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!user) {
     return res.status(401).json({ error: "Unauthorized. Please sign in again." });
   }
+  if (user.role !== "admin" && user.role !== "staff") {
+    return res.status(403).json({ error: "Access Denied: Guest access is disabled." });
+  }
   (req as any).user = user;
   return next();
 }

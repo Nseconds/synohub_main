@@ -15,7 +15,16 @@ export function registerServiceRequestRoutes(app: Express) {
   });
 
   app.post("/api/services", requireAuth, async (req, res) => {
-    res.status(403).json({ error: "CRM writes are disabled. Existing database records will not be modified." });
+    try {
+      const authUser = getAuthUser(req);
+      if (authUser.role === "guest") {
+        return res.status(403).json({ error: "Access Denied: Guest users cannot create service requests." });
+      }
+      const result = await createServiceTicket(req.body, authUser);
+      res.status(201).json(result);
+    } catch (error) {
+      res.status(500).json({ error: (error as Error).message });
+    }
   });
 
   app.put("/api/leads/:id", requireAuth, async (req, res) => {
