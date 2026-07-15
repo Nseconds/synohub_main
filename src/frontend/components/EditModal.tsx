@@ -37,15 +37,15 @@ export const EditModal = ({
     >
       <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between bg-zinc-50">
         <h3 className="font-extrabold text-zinc-900 text-xs uppercase tracking-wider flex items-center gap-2">
-          <Database size={14} className="text-teal-accent" /> Edit {editingItem.type === "lead" ? "Lead Registration" : editingItem.type === "service" ? "Service Ticket" : "Customer Account"}
+          <Database size={14} className="text-teal-accent" /> View {editingItem.type === "lead" ? "Lead Registration" : editingItem.type === "service" ? "Service Ticket" : "Customer Account"}
         </h3>
         <button onClick={() => setEditingItem(null)} className="p-1.5 hover:bg-zinc-250 rounded-lg text-zinc-400">
           <X size={16} />
         </button>
       </div>
       
-      <form onSubmit={onSubmit} className="p-6 overflow-y-auto space-y-4 text-xs">
-        <fieldset disabled={userRole !== "admin"} className="space-y-4 w-full border-none p-0 m-0">
+      <form onSubmit={(e) => { e.preventDefault(); setEditingItem(null); }} className="p-6 overflow-y-auto space-y-4 text-xs">
+        <fieldset disabled={true} className="space-y-4 w-full border-none p-0 m-0">
         
         {editingItem.type === "lead" && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -143,15 +143,8 @@ export const EditModal = ({
         )}
         </fieldset>
 
-        <div className="flex justify-end gap-3 pt-4 border-t border-zinc-100">
-          <button type="button" onClick={() => setEditingItem(null)} className="px-4 py-2 border border-zinc-200 rounded-lg text-zinc-500 font-bold text-[10px] uppercase hover:bg-zinc-50">Cancel</button>
-          <button 
-            type="submit" 
-            disabled={userRole !== "admin"}
-            className="px-6 py-2 bg-teal-accent disabled:bg-zinc-300 disabled:text-zinc-500 disabled:cursor-not-allowed disabled:shadow-none text-white rounded-lg font-bold text-[10px] uppercase hover:opacity-95 shadow-md shadow-teal-accent/10 whitespace-nowrap cursor-pointer"
-          >
-            {userRole !== "admin" ? "Read Only" : "Save Changes"}
-          </button>
+        <div className="flex justify-end pt-4 border-t border-zinc-100">
+          <button type="button" onClick={() => setEditingItem(null)} className="px-5 py-2 bg-zinc-100 border border-zinc-200 hover:bg-zinc-200 text-zinc-600 rounded-lg font-bold text-[10px] uppercase transition-colors">Close</button>
         </div>
       </form>
     </motion.div>
