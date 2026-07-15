@@ -240,11 +240,16 @@ export async function startServer() {
       const stopWords = new Set([
         "the", "a", "an", "for", "at", "on", "in", "of", "and", "to", "with", "is", "are", "was", "were", 
         "be", "been", "have", "has", "had", "do", "does", "did", "no", "not", "yes", "both", "show", 
-        "connection", "locator", "installation", "vehicles", "units", "contact", "need", "please", 
-        "specified", "pending", "amount", "quantity", "service", "ticket", "request", "issue", 
-        "description", "location", "plate", "number", "sim", "device", "gps", "tracker", "car", 
-        "truck", "van", "bike", "mobile", "phone", "email", "address", "hi", "hello", "hey", "dear",
-        "i", "you", "he", "she", "it", "we", "they", "me", "him", "her", "us", "them", "my", "your"
+        "connection", "locator", "installation", "reinstallation", "removal", "vehicles", "units", 
+        "contact", "need", "please", "specified", "pending", "amount", "quantity", "service", 
+        "ticket", "request", "issue", "description", "location", "plate", "number", "sim", 
+        "device", "gps", "tracker", "car", "truck", "van", "bike", "mobile", "phone", "email", 
+        "address", "hi", "hello", "hey", "dear", "i", "you", "he", "she", "it", "we", "they", 
+        "me", "him", "her", "us", "them", "my", "your", "sales", "person", "requested", "accessories",
+        "driver", "preferred", "date", "time",
+        // Location and City names (so location names are not matched as customer names)
+        "auh", "dxb", "shj", "rak", "uaq", "abu", "dhabi", "dubai", "sharjah", "ajman", 
+        "fujairah", "ras", "al", "khaimah", "umm", "quwain"
       ]);
 
       const searchTerms = String(message || "")

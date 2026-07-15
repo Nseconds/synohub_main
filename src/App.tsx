@@ -67,7 +67,7 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterRegion, setFilterRegion] = useState("All");
   const [filterStatus, setFilterStatus] = useState("All");
-  const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
+
   const [showAllFeed, setShowAllFeed] = useState(false);
 
   // Data Manager States
@@ -233,7 +233,7 @@ export default function App() {
         await createLead(leadForm);
         showToast("Lead registration created in database and synchronized with Customers successfully!");
       }
-      setIsLeadModalOpen(false);
+
       fetchData();
       resetLeadForm();
     } catch (err) {
@@ -455,134 +455,7 @@ export default function App() {
         }
       >
           <AnimatePresence mode="wait">
-            {/* Lead Creation Modal */}
-            <Modal isOpen={isLeadModalOpen} onClose={() => setIsLeadModalOpen(false)} title="Register New Lead">
-               <form onSubmit={handleLeadSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                 <div className="space-y-4">
-                    <div>
-                        <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Customer Name *</label>
-                        <input required type="text" value={leadForm.customerName || ""} onChange={e => setLeadForm({...leadForm, customerName: e.target.value})} className="w-full bg-zinc-50 border border-zinc-200 rounded-lg p-2 text-xs focus:outline-none focus:border-teal-accent/50" />
-                    </div>
-                    <div>
-                        <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Contact Name</label>
-                        <input type="text" value={leadForm.contactName || ""} onChange={e => setLeadForm({...leadForm, contactName: e.target.value})} className="w-full bg-zinc-50 border border-zinc-200 rounded-lg p-2 text-xs focus:outline-none focus:border-teal-accent/50" />
-                    </div>
-                    <div>
-                        <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Designation</label>
-                        <input type="text" value={leadForm.designation || ""} onChange={e => setLeadForm({...leadForm, designation: e.target.value})} className="w-full bg-zinc-50 border border-zinc-200 rounded-lg p-2 text-xs focus:outline-none focus:border-teal-accent/50" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Phone</label>
-                            <input type="text" value={leadForm.phone || ""} onChange={e => setLeadForm({...leadForm, phone: e.target.value})} className="w-full bg-zinc-50 border border-zinc-200 rounded-lg p-2 text-xs focus:outline-none focus:border-teal-accent/50" />
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Email</label>
-                            <input type="email" value={leadForm.email || ""} onChange={e => setLeadForm({...leadForm, email: e.target.value})} className="w-full bg-zinc-50 border border-zinc-200 rounded-lg p-2 text-xs focus:outline-none focus:border-teal-accent/50" />
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Region</label>
-                            <select value={leadForm.region} onChange={e => setLeadForm({...leadForm, region: e.target.value})} className="w-full bg-zinc-50 border border-zinc-200 rounded-lg p-2 text-xs focus:outline-none focus:border-teal-accent/50">
-                                {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Source</label>
-                            <select value={leadForm.source} onChange={e => setLeadForm({...leadForm, source: e.target.value})} className="w-full bg-zinc-50 border border-zinc-200 rounded-lg p-2 text-xs focus:outline-none focus:border-teal-accent/50">
-                                {SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
-                            </select>
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Address</label>
-                        <textarea rows={2} value={leadForm.address || ""} onChange={e => setLeadForm({...leadForm, address: e.target.value})} className="w-full bg-zinc-50 border border-zinc-200 rounded-lg p-2 text-xs focus:outline-none focus:border-teal-accent/50 resize-none" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Coordinates</label>
-                            <input type="text" placeholder="Lat, Long" value={leadForm.coordinates || ""} onChange={e => setLeadForm({...leadForm, coordinates: e.target.value})} className="w-full bg-zinc-50 border border-zinc-200 rounded-lg p-2 text-xs focus:outline-none focus:border-teal-accent/50" />
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Map Link</label>
-                            <input type="text" value={leadForm.mapLink || ""} onChange={e => setLeadForm({...leadForm, mapLink: e.target.value})} className="w-full bg-zinc-50 border border-zinc-200 rounded-lg p-2 text-xs focus:outline-none focus:border-teal-accent/50" />
-                        </div>
-                    </div>
-                 </div>
 
-                 <div className="space-y-4">
-                     <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Status</label>
-                            <select value={leadForm.status} onChange={e => setLeadForm({...leadForm, status: e.target.value})} className="w-full bg-zinc-50 border border-zinc-200 rounded-lg p-2 text-xs focus:outline-none focus:border-teal-accent/50">
-                                {LEAD_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Implementation Type</label>
-                            <select value={leadForm.implementationType} onChange={e => setLeadForm({...leadForm, implementationType: e.target.value})} className="w-full bg-zinc-50 border border-zinc-200 rounded-lg p-2 text-xs focus:outline-none focus:border-teal-accent/50">
-                                {IMPLEMENTATION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                            </select>
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Sales Person</label>
-                            <select value={leadForm.salesPerson} onChange={e => setLeadForm({...leadForm, salesPerson: e.target.value})} className="w-full bg-zinc-50 border border-zinc-200 rounded-lg p-2 text-xs focus:outline-none focus:border-teal-accent/50">
-                                {SALES_PEOPLE.map(p => <option key={p} value={p}>{p}</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Sales Type</label>
-                            <select value={leadForm.salesType} onChange={e => setLeadForm({...leadForm, salesType: e.target.value})} className="w-full bg-zinc-50 border border-zinc-200 rounded-lg p-2 text-xs focus:outline-none focus:border-teal-accent/50">
-                                {SALES_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                            </select>
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Requested Person</label>
-                        <select value={leadForm.requestedPerson} onChange={e => setLeadForm({...leadForm, requestedPerson: e.target.value})} className="w-full bg-zinc-50 border border-zinc-200 rounded-lg p-2 text-xs focus:outline-none focus:border-teal-accent/50">
-                            <option value="">Select requested person</option>
-                            {requestedPeopleList.map(p => <option key={p} value={p}>{p}</option>)}
-                        </select>
-                    </div>
-                    <div className="grid grid-cols-4 gap-2 text-center">
-                        <div>
-                            <label className="block text-[8px] font-bold text-zinc-400 uppercase mb-1">New</label>
-                            <input type="number" min="0" value={leadForm.newQty || 0} onChange={e => setLeadForm({...leadForm, newQty: parseInt(e.target.value)})} className="w-full bg-zinc-50 border border-zinc-200 rounded p-1 text-xs text-center" />
-                        </div>
-                        <div>
-                            <label className="block text-[8px] font-bold text-zinc-400 uppercase mb-1">Migrate</label>
-                            <input type="number" min="0" value={leadForm.migrateQty || 0} onChange={e => setLeadForm({...leadForm, migrateQty: parseInt(e.target.value)})} className="w-full bg-zinc-50 border border-zinc-200 rounded p-1 text-xs text-center" />
-                        </div>
-                        <div>
-                            <label className="block text-[8px] font-bold text-zinc-400 uppercase mb-1">Trading</label>
-                            <input type="number" min="0" value={leadForm.tradingQty || 0} onChange={e => setLeadForm({...leadForm, tradingQty: parseInt(e.target.value)})} className="w-full bg-zinc-50 border border-zinc-200 rounded p-1 text-xs text-center" />
-                        </div>
-                        <div>
-                            <label className="block text-[8px] font-bold text-zinc-400 uppercase mb-1">Other</label>
-                            <input type="number" min="0" value={leadForm.otherQty || 0} onChange={e => setLeadForm({...leadForm, otherQty: parseInt(e.target.value)})} className="w-full bg-zinc-50 border border-zinc-200 rounded p-1 text-xs text-center" />
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Project Value</label>
-                            <input type="text" value={leadForm.projectValue || ""} onChange={e => setLeadForm({...leadForm, projectValue: e.target.value})} className="w-full bg-zinc-50 border border-zinc-200 rounded-lg p-2 text-xs focus:outline-none focus:border-teal-accent/50" />
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Accessories</label>
-                            <input type="text" value={leadForm.accessories || ""} onChange={e => setLeadForm({...leadForm, accessories: e.target.value})} className="w-full bg-zinc-50 border border-zinc-200 rounded-lg p-2 text-xs focus:outline-none focus:border-teal-accent/50" />
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Comment</label>
-                        <textarea rows={2} value={leadForm.comment || ""} onChange={e => setLeadForm({...leadForm, comment: e.target.value})} className="w-full bg-zinc-50 border border-zinc-200 rounded-lg p-2 text-xs focus:outline-none focus:border-teal-accent/50 resize-none" />
-                    </div>
-                    <button type="submit" className="w-full bg-teal-accent text-white font-bold py-3 rounded-xl shadow-lg shadow-teal-accent/20 hover:opacity-90 transition-all text-xs uppercase tracking-widest mt-4">Save Record</button>
-                 </div>
-               </form>
-            </Modal>
 
             {searchTerm.trim() !== "" ? (
               <div className="bg-[#F8FAFC] min-h-screen p-8">
