@@ -1,6 +1,6 @@
 export interface StoredUser {
   name: string;
-  role: "admin" | "staff" | "guest";
+  role: "admin" | "staff";
   token: string;
 }
 
@@ -12,6 +12,6 @@ export const isValidStoredUser = (value: unknown): value is StoredUser => {
     typeof (value as StoredUser).role === "string" &&
     typeof (value as StoredUser).token === "string" &&
     (value as StoredUser).token.length > 0 &&
-    ((value as StoredUser).role === "admin" || (value as StoredUser).role === "staff" || (value as StoredUser).role === "guest")
+    ((value as StoredUser).role === "admin" || (value as StoredUser).role === "staff")
   );
 };

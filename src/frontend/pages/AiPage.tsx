@@ -35,7 +35,7 @@ export const AiPage = ({
     </div>
     <ChatInterface
       currentUser={user}
-      userKey={user ? `${user.role}:${user.name}` : "guest:guest"}
+      userKey={user ? `${user.role}:${user.name}` : "staff:system"}
       staffOptions={staffOptions}
       forcedInput={forcedInput}
       onInputLoaded={onInputLoaded}

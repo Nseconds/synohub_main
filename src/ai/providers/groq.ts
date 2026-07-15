@@ -1,29 +1,54 @@
-export async function runGeminiChatCompletion(args: {
-  genAI: any;
+import axios from "axios";
+
+export async function runGroqChatCompletion(args: {
+  apiKey: string;
   model: string;
   systemInstruction: string;
   history: Array<{ role: "user" | "assistant"; content: string }>;
   message: string;
 }): Promise<string> {
-  const conversation = [
-    ...args.history.map(h => `${h.role === "assistant" ? "Assistant" : "User"}: ${h.content}`),
-    `User: ${args.message}`,
-  ].join("\n\n");
+  const messages = [
+    { role: "system", content: args.systemInstruction },
+    ...args.history.map(h => ({
+      role: (h.role === "assistant" ? "assistant" : "user") as "assistant" | "user",
+      content: h.content,
+    })),
+    { role: "user", content: args.message },
+  ];
 
   try {
-    const response = await args.genAI.models.generateContent({
-      model: args.model,
-      contents: conversation,
-      config: {
-        systemInstruction: args.systemInstruction,
+    const response = await axios.post(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        model: args.model,
+        messages,
       },
-    });
+      {
+        headers: {
+          "Authorization": `Bearer ${args.apiKey}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
 
-    return response.text;
+    if (response.data?.choices?.[0]?.message?.content) {
+      return response.data.choices[0].message.content;
+    }
+    throw new Error("No response choices returned from Groq.");
   } catch (err: any) {
     const errStr = String(err.message || err.stack || err || "");
-    if (errStr.includes("RESOURCE_EXHAUSTED") || errStr.includes("quota") || errStr.includes("503") || errStr.includes("limit") || errStr.includes("UNAVAILABLE")) {
-      console.warn("[AI Chat] Gemini rate limit hit, running local rule-based completion fallback.");
+    const isRateLimitOrTimeout = 
+      errStr.includes("RESOURCE_EXHAUSTED") || 
+      errStr.includes("quota") || 
+      errStr.includes("503") || 
+      errStr.includes("429") || 
+      errStr.includes("limit") || 
+      errStr.includes("UNAVAILABLE") ||
+      err.response?.status === 429 ||
+      err.response?.status === 503;
+
+    if (isRateLimitOrTimeout) {
+      console.warn("[AI Chat] Groq rate limit hit, running local rule-based completion fallback.");
       
       const msg = args.message;
       if (/locator|installation|vehicles|units|connection/i.test(msg)) {

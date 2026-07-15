@@ -62,19 +62,7 @@ export function chatHistoryPredicates(channel: string) {
       ...legacyModeChannels.map(legacyChannel => eq(messages.username, legacyChannel)),
     );
   }
-  if (channel === "guest") {
-    return or(
-      eq(messages.username, "guest"),
-      like(messages.username, "guest:%"),
-      ...legacyModeChannels.map(legacyChannel => eq(messages.username, legacyChannel)),
-    );
-  }
-  if (channel.startsWith("guest:")) {
-    return or(
-      eq(messages.username, channel),
-      ...legacyModeChannels.map(legacyChannel => eq(messages.username, legacyChannel)),
-    );
-  }
+  
   return or(
     eq(messages.username, channel),
     ...legacyModeChannels.map(legacyChannel => eq(messages.username, legacyChannel)),

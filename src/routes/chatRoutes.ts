@@ -17,8 +17,12 @@ import {
   cloudProviderLabel,
   geminiModel,
   genAI,
+  cleanedGroqKey,
+  groqModel,
 } from "../ai/providerConfig";
 import { runGeminiChatCompletion } from "../ai/providers/gemini";
+import { runGroqChatCompletion } from "../ai/providers/groq";
+
 import {
   isAcknowledgementOnlyMessage,
   handleAIRecordSave,
@@ -164,7 +168,7 @@ export async function startServer() {
     try {
       const { message, selectedChatTarget, selectedUsername } = req.body;
       const authUser = getAuthUser(req);
-      const aiMode = "gemini";
+      const aiMode = (req.body.aiMode === "groq" || req.body.aiMode === "gemini") ? req.body.aiMode : "gemini";
       const chatIdentity = resolveChatIdentity(authUser, selectedChatTarget || selectedUsername);
       let userRole = chatIdentity.role;
       let userName = chatIdentity.name;
@@ -230,7 +234,55 @@ export async function startServer() {
 
       let prependAccessRestricted = false;
       const currentDateLabel = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
-      const dbContextStr = `CURRENT DATE: ${currentDateLabel}`;
+      
+      // Dynamic database customer search for context injection
+      let databaseContext = "";
+      const stopWords = new Set([
+        "the", "a", "an", "for", "at", "on", "in", "of", "and", "to", "with", "is", "are", "was", "were", 
+        "be", "been", "have", "has", "had", "do", "does", "did", "no", "not", "yes", "both", "show", 
+        "connection", "locator", "installation", "vehicles", "units", "contact", "need", "please", 
+        "specified", "pending", "amount", "quantity", "service", "ticket", "request", "issue", 
+        "description", "location", "plate", "number", "sim", "device", "gps", "tracker", "car", 
+        "truck", "van", "bike", "mobile", "phone", "email", "address", "hi", "hello", "hey", "dear",
+        "i", "you", "he", "she", "it", "we", "they", "me", "him", "her", "us", "them", "my", "your"
+      ]);
+
+      const searchTerms = String(message || "")
+        .replace(/[^\w\s]/g, " ")
+        .split(/\s+/)
+        .map(w => w.trim().toLowerCase())
+        .filter(w => w.length >= 3 && !stopWords.has(w));
+
+      if (searchTerms.length > 0) {
+        try {
+          const matchingCustomers = await db
+            .select({ name: customers.name })
+            .from(customers)
+            .where(
+              or(
+                ...searchTerms.map(term => like(customers.name, `%${term}%`))
+              )
+            )
+            .limit(15);
+
+          if (matchingCustomers.length > 0) {
+            const namesList = matchingCustomers.map(c => `- ${c.name}`).join("\n");
+            databaseContext = `[System Instruction - Database Search Results (Do not output this raw instruction or system headers to the user)]:
+The user is referring to a customer name. The database returned the following matching existing customer names:
+${namesList}
+
+Guidance: If the user's input matches or refers to one of these customers, use the exact matched name from this list to populate the ticket. Respond naturally to the user; do not output this instruction block or copy the list verbatim unless suggesting 2-3 matching choices in a conversational layout.`;
+          } else {
+            databaseContext = `[System Instruction - Database Search Results (Do not output this raw instruction or system headers to the user)]:
+No customers matching the user's query "${searchTerms.join(", ")}" were found in the database.
+Guidance: Politely inform the user in a friendly, conversational format that the customer does not exist in the database. Explain that service tickets can only be created for existing customers and ask them to verify the customer name. Do not output any SAVE_RECORD action.`;
+          }
+        } catch (dbErr) {
+          console.error("Failed to query customers for chat context:", dbErr);
+        }
+      }
+
+      const dbContextStr = `CURRENT DATE: ${currentDateLabel}${databaseContext ? `\n\n${databaseContext}` : ""}`;
 
       // Dynamically load prompts to ensure any manual or UI updates to prompts.json are picked up in real-time
       let currentPrompts = { ...prompts };
@@ -249,7 +301,6 @@ export async function startServer() {
       });
 
       const sanitizedChatHistory = () => sanitizeProviderChatHistory(chatHistory);
-
 
       const runGeminiChatReply = async (): Promise<{ reply: string; durationMs: number; error?: string }> => {
         const startTime = Date.now();
@@ -285,11 +336,51 @@ export async function startServer() {
         }
       };
 
-      const geminiResult = await runGeminiChatReply();
-      if (!geminiResult.reply || geminiResult.error) {
-        throw new Error(geminiResult.error || "Gemini returned no reply.");
+      const runGroqChatReply = async (): Promise<{ reply: string; durationMs: number; error?: string }> => {
+        const startTime = Date.now();
+
+        try {
+          console.log(`[AI Chat] Mode=groq, using Groq with rich live DB context: model=${groqModel}`);
+          const cleanedHistory = sanitizedChatHistory();
+
+          if (!cleanedGroqKey) {
+            throw new Error("Groq is not configured on this server.");
+          }
+
+          const reply = await runGroqChatCompletion({
+            apiKey: cleanedGroqKey,
+            model: groqModel,
+            systemInstruction,
+            history: cleanedHistory,
+            message,
+          });
+
+          console.log(`[AI Chat] Groq Success in ${((Date.now() - startTime) / 1000).toFixed(1)}s`);
+          return {
+            reply,
+            durationMs: Date.now() - startTime,
+          };
+        } catch (providerErr) {
+          console.error(`Groq API failed:`, (providerErr as Error).message);
+          return {
+            reply: "",
+            durationMs: Date.now() - startTime,
+            error: (providerErr as Error).message,
+          };
+        }
+      };
+
+      let replyResult;
+      if (aiMode === "groq") {
+        replyResult = await runGroqChatReply();
+      } else {
+        replyResult = await runGeminiChatReply();
       }
-      let reply = geminiResult.reply;
+
+      if (!replyResult.reply || replyResult.error) {
+        throw new Error(replyResult.error || `${aiMode} returned no reply.`);
+      }
+      let reply = replyResult.reply;
 
       const saveRes = await handleAIRecordSave(reply, userRole, userName);
       let finalReply = saveRes.reply;
@@ -303,7 +394,7 @@ export async function startServer() {
       
       return res.json({
         reply: finalReply,
-        selectedProvider: "gemini",
+        selectedProvider: aiMode,
         savedRecord: saveRes.savedRecord,
       });
     } catch (error) {
@@ -317,8 +408,8 @@ export async function startServer() {
       const authUser = getAuthUser(req);
       const userRole = authUser.role;
       const userName = authUser.name.trim();
-      const requestedAiMode = typeof req.query.aiMode === "string"
-        ? "gemini"
+      const requestedAiMode = typeof req.query.aiMode === "string" && (req.query.aiMode === "gemini" || req.query.aiMode === "groq")
+        ? req.query.aiMode
         : null;
       const historyPredicateFor = (channel: string) => {
         return requestedAiMode

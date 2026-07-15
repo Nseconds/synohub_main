@@ -10,8 +10,9 @@ export interface ChatMessage {
   username?: string;
 }
 
-export type SafeQueryAiMode = "gemini";
-export type CompareProvider = "gemini";
+export type SafeQueryAiMode = "gemini" | "groq";
+export type CompareProvider = "gemini" | "groq";
+
 
 interface CurrentUser {
   name: string;
@@ -125,9 +126,14 @@ export const ChatPage = ({
             <div className="flex items-center gap-2">
               <Sparkles size={14} className="text-zinc-500" />
               <span className="text-zinc-500 font-medium">AI Mode:</span>
-              <span className="bg-white border border-zinc-200 rounded px-2 py-1 text-xs text-zinc-800 font-medium">
-                Gemini
-              </span>
+              <select
+                value={aiMode}
+                onChange={(e) => onAiModeChange(e.target.value as SafeQueryAiMode)}
+                className="bg-white border border-zinc-200 rounded px-2 py-1 text-xs text-zinc-800 font-bold focus:outline-none focus:border-teal-accent/50 cursor-pointer shadow-xs"
+              >
+                <option value="gemini">Gemini</option>
+                <option value="groq">Groq (Grok)</option>
+              </select>
             </div>
 
           </div>

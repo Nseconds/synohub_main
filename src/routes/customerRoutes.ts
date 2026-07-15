@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { desc, eq, like, or } from "drizzle-orm";
+import { desc, eq, like, or, sql } from "drizzle-orm";
 import { getAuthUser, requireAuth, requireRoles } from "../auth/middleware";
 import { normalizeUserName } from "../auth/users";
 import { db } from "../db";
@@ -27,7 +27,7 @@ export function registerCustomerRoutes(app: Express) {
         .select({
           id: customers.id,
           name: customers.name,
-          traccarId: customers.traccarId,
+          traccarId: customersLocator.customerTraccarId,
           contactName: customers.contactName,
           phone: customers.phone,
           email: customers.email,
@@ -35,7 +35,7 @@ export function registerCustomerRoutes(app: Express) {
           implementationType: customers.implementationType,
           vehicleCount: customers.vehicleCount,
           createdBy: customers.createdBy,
-          address: customers.address,
+          address: sql<string | null>`NULL`,
           customerUsername: customersLocator.customerUsername,
           locatorPlan: customersLocator.locatorPlan,
         })

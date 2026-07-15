@@ -34,8 +34,11 @@ export const ChatInterface = ({
   const activeChatScopeRef = useRef("");
   const historyRequestRef = useRef(0);
   const [selectedChatTarget, setSelectedChatTarget] = useState("admin");
-  const [aiMode, setAiMode] = useState<SafeQueryAiMode>("gemini");
-  const compareProviders: CompareProvider[] = ["gemini"];
+  const [aiMode, setAiMode] = useState<SafeQueryAiMode>(() => {
+    const saved = localStorage.getItem("synohub-ai-mode");
+    return (saved === "gemini" || saved === "groq") ? saved : "gemini";
+  });
+  const compareProviders: CompareProvider[] = ["gemini", "groq"];
   const isAdminViewingOtherChat = currentUser?.role === "admin" && selectedChatTarget !== "admin" && !selectedChatTarget.startsWith("user:");
   const chatScopeKey = `${userKey || ""}|${currentUser?.role || ""}|${selectedChatTarget}|${aiMode}`;
   const [usersList, setUsersList] = useState<{ id: number; name: string; username: string }[]>([]);
@@ -44,8 +47,7 @@ export const ChatInterface = ({
     if (target.startsWith("user:")) return target;
     if (!currentUser) return "";
     if (currentUser.role === "admin") return target || "admin";
-    if (currentUser.role === "staff") return `staff:${currentUser.name.trim()}`;
-    return `guest:${currentUser.name.trim().toLowerCase()}`;
+    return `staff:${currentUser.name.trim()}`;
   };
 
   const getModeChatChannel = (mode: SafeQueryAiMode, target = selectedChatTarget) => {
@@ -132,7 +134,7 @@ export const ChatInterface = ({
     const sendScopeKey = chatScopeKey;
 
     try {
-      const payload: any = { message: userMsg, aiMode: "gemini" };
+      const payload: any = { message: userMsg, aiMode };
       if (currentUser?.role === "admin") {
         payload.selectedChatTarget = selectedChatTarget;
       }
@@ -166,7 +168,10 @@ export const ChatInterface = ({
       messages={messages}
       loading={loading}
       input={input}
-      onAiModeChange={setAiMode}
+      onAiModeChange={(mode) => {
+        setAiMode(mode);
+        localStorage.setItem("synohub-ai-mode", mode);
+      }}
       onToggleCompareProvider={toggleCompareProvider}
       onChatTargetChange={setSelectedChatTarget}
       onInputChange={setInput}

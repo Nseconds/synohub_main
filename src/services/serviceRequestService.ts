@@ -1,5 +1,5 @@
-import { eq } from "drizzle-orm";
-import { db, getNextId, resolveUserIdByName } from "../db";
+import { eq, like } from "drizzle-orm";
+import { db, getNextId, pool, resolveUserIdByName } from "../db";
 import { customers, serviceRequests } from "../db/schema";
 import type { AuthUser } from "../auth/users";
 import { saveLocalSalesplusEntry } from "./salesplusService";
@@ -60,6 +60,105 @@ function isMissingTemplateValue(value: string): boolean {
 
 function normalizeComparableName(value: string): string {
   return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
+}
+
+function parseOptionalDate(value: string | undefined): Date | null | undefined {
+  if (!value) return undefined;
+  const trimmed = String(value).trim();
+  if (!trimmed) return undefined;
+  const parsed = new Date(trimmed);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function parseAmountToIntString(val: any): string | null {
+  if (val === null || val === undefined) return null;
+  const strVal = String(val).trim();
+  if (!strVal || /^(not specified|na|n\/a|none|null|-)$/i.test(strVal)) return null;
+  const match = strVal.match(/[-+]?[0-9]+/);
+  if (match) {
+    const num = parseInt(match[0], 10);
+    return isNaN(num) ? null : String(num);
+  }
+  return null;
+}
+
+function parsePaymentStatus(value: any): "paid" | "notpaid" | null {
+  if (!value) return null;
+  const str = String(value).trim().toLowerCase();
+  if (str === "paid" || str === "yes") return "paid";
+  if (str === "notpaid" || str === "not paid" || str === "unpaid" || str === "pending" || str === "no") return "notpaid";
+  return null;
+}
+
+function truncateString(val: any, maxLen: number, fallback = ""): string {
+  if (val === null || val === undefined) return fallback;
+  return String(val).substring(0, maxLen);
+}
+
+function truncateStringNullable(val: any, maxLen: number): string | null {
+  if (val === null || val === undefined || String(val).trim() === "") return null;
+  return String(val).substring(0, maxLen);
+}
+
+export async function getLocatorDetailsForCustomer(customerName: string, customerId?: number | null) {
+  const trimmedName = String(customerName || "").trim();
+  if (!trimmedName && !customerId) return {};
+
+  try {
+    const [rows]: any[] = customerId
+      ? await pool.query(
+          "SELECT customer_expiry_date, locator_plan FROM customers_locator WHERE customer_id = ? LIMIT 1",
+          [customerId],
+        )
+      : await pool.query(
+          "SELECT customer_expiry_date, locator_plan FROM customers_locator WHERE customer_name = ? LIMIT 1",
+          [trimmedName],
+        );
+
+    const row = Array.isArray(rows) ? rows[0] : null;
+    if (!row) return {};
+
+    return {
+      customerExpiryDate: row.customer_expiry_date ? String(row.customer_expiry_date) : undefined,
+      locatorPlan: row.locator_plan ? String(row.locator_plan) : undefined,
+    };
+  } catch (error) {
+    console.warn(`[serviceRequestService] Failed to lookup locator details for ${trimmedName || customerId}:`, error);
+    return {};
+  }
+}
+
+export async function getCustomerLookupDetails(customerName: string, customerId?: number | null) {
+  const trimmedName = String(customerName || "").trim();
+  if (!trimmedName) return {};
+
+  try {
+    let matchedCustomer: any = null;
+
+    if (trimmedName) {
+      const rows = await db.select().from(customers).where(eq(customers.name, trimmedName)).limit(1);
+      matchedCustomer = rows[0] || null;
+    }
+
+    if (!matchedCustomer && trimmedName) {
+      const rows = await db.select().from(customers).where(like(customers.name, `%${trimmedName}%`)).limit(1);
+      matchedCustomer = rows[0] || null;
+    }
+
+    if (!matchedCustomer) return {};
+
+    return {
+      phone: matchedCustomer.phone ? String(matchedCustomer.phone) : undefined,
+      email: matchedCustomer.email ? String(matchedCustomer.email) : undefined,
+      contactName: matchedCustomer.contactName ? String(matchedCustomer.contactName) : undefined,
+      address: matchedCustomer.address ? String(matchedCustomer.address) : undefined,
+      region: matchedCustomer.region ? String(matchedCustomer.region) : undefined,
+      implementationType: matchedCustomer.implementationType ? String(matchedCustomer.implementationType) : undefined,
+    };
+  } catch (error) {
+    console.warn(`[serviceRequestService] Failed to lookup customer details for ${trimmedName || customerId}:`, error);
+    return {};
+  }
 }
 
 function toPotentialCustomerMatch(customer: any): PotentialCustomerMatch {
@@ -151,6 +250,7 @@ export async function saveForcedServiceRequestFields(
     fields.requestedPerson = authUser.name.trim();
   }
   validateForcedServiceRequestFields(fields);
+  const creatorId = await resolveUserIdByName(authUser.name || "system");
 
   const matchedCustomer = await findExistingCustomerForServiceRequest(fields, options);
   if (matchedCustomer && !options.forceNewCustomer && !options.confirmedCustomerId) {
@@ -218,17 +318,16 @@ export async function saveForcedServiceRequestFields(
 
   if (!matchedCustomer) {
     const nextCustId = await getNextId("customers", "id");
-    const creatorId = await resolveUserIdByName(authUser.name || "guest");
     const [customerResult]: any = await db.insert(customers).values({
       id: nextCustId,
-      name: fields.customerName,
-      contactName: fields.contactName,
-      phone: fields.phone,
-      email: fields.email,
-      region,
-      implementationType: fields.implementationType,
+      name: truncateString(fields.customerName, 255),
+      contactName: truncateStringNullable(fields.contactName, 255),
+      phone: truncateStringNullable(fields.phone, 50),
+      email: truncateStringNullable(fields.email, 255),
+      region: truncateStringNullable(region, 100),
+      implementationType: truncateStringNullable(fields.implementationType, 100),
       vehicleCount: fields.quantity,
-      createdBy: String(creatorId),
+      createdBy: truncateStringNullable(String(creatorId), 255),
     });
     customerId = nextCustId;
     customerCreated = true;
@@ -241,26 +340,44 @@ export async function saveForcedServiceRequestFields(
     fields.driverNumber ? `Driver Number: ${fields.driverNumber}` : "",
   ].filter(Boolean).join("\n");
 
+  const locatorDetails = await getLocatorDetailsForCustomer(customerName, customerId);
+  const customerDetails = await getCustomerLookupDetails(customerName, customerId);
+
+  let finalRegion = region;
+  let mapLink = "";
+  if (fields.location && (fields.location.startsWith("http") || fields.location.includes("maps."))) {
+    mapLink = fields.location;
+    finalRegion = customerDetails.region || matchedCustomer?.region || "Dubai";
+  }
+
+  const contactPhone = fields.phone || customerDetails.phone || matchedCustomer?.phone || "";
+  const finalDescription = contactPhone 
+    ? `${fields.issueDescription} (Contact: ${contactPhone})` 
+    : fields.issueDescription;
+
   const nextServiceId = await getNextId("tbl_customer_services_beta", "customer_service_id");
   const serviceInsert = {
     id: nextServiceId,
     customerId,
     createdAt: new Date().toISOString().substring(0, 10),
-    createdBy: authUser.name.trim() || "guest",
-    region,
+    createdBy: String(creatorId),
+    region: truncateStringNullable(finalRegion, 20),
     status: "new",
-    implementationType: fields.implementationType,
-    customerName,
-    contactName: fields.contactName,
-    phone: fields.phone,
-    email: fields.email,
+    implementationType: truncateString(fields.implementationType || "", 25),
+    customerName: truncateString(customerName, 100),
+    contactName: truncateStringNullable(fields.contactName || customerDetails.contactName || "", 50),
+    phone: truncateStringNullable(fields.phone || customerDetails.phone || "", 20),
+    email: truncateStringNullable(fields.email || customerDetails.email || "", 500),
+    customerExpiryDate: parseOptionalDate(locatorDetails.customerExpiryDate),
+    locatorPlan: truncateStringNullable(locatorDetails.locatorPlan, 20),
+    mapLink,
     newQty: fields.quantity,
     accessories: fields.accessories || notes || "",
     requestedPerson: fields.requestedPerson,
     salesPerson: fields.requestedPerson,
-    amount: fields.amount,
-    issueDescription: fields.issueDescription,
-    paymentStatus: fields.paymentStatus,
+    amount: parseAmountToIntString(fields.amount),
+    issueDescription: finalDescription,
+    paymentStatus: parsePaymentStatus(fields.paymentStatus),
   };
 
   const [serviceResult]: any = await db.insert(serviceRequests).values(serviceInsert);
@@ -331,28 +448,31 @@ export async function createLeadRegistration(body: any, authUser: AuthUser) {
   }
   const leadSalesPerson = payload.salesPerson || resolvedPerson;
 
+  const locatorDetails = await getLocatorDetailsForCustomer(payload.customerName || "", Number((payload as any).customerId || 0));
   const nextId = await getNextId("tbl_customer_services_beta", "customer_service_id");
-  const creatorId = await resolveUserIdByName(payload.source || userName || "guest");
-  const requestedPersonId = await resolveUserIdByName(resolvedPerson);
-  const salesPersonId = await resolveUserIdByName(leadSalesPerson);
+  const creatorId = await resolveUserIdByName(String(payload.source || userName || "guest"));
+  const requestedPersonId = await resolveUserIdByName(String(resolvedPerson));
+  const salesPersonId = await resolveUserIdByName(String(leadSalesPerson));
   const [result]: any = await db.insert(serviceRequests).values({
     id: nextId,
     customerId: 0,
-    customerName: payload.customerName || "",
-    contactName: payload.contactName || "",
-    phone: payload.phone || "",
-    email: payload.email || "",
-    region: payload.region || "",
-    address: payload.address || "",
+    customerName: truncateString(payload.customerName || "", 100),
+    contactName: truncateStringNullable(payload.contactName, 50),
+    phone: truncateStringNullable(payload.phone, 20),
+    email: truncateStringNullable(payload.email, 500),
+    region: truncateStringNullable(payload.region, 20),
+    address: truncateStringNullable(payload.address, 200),
+    customerExpiryDate: parseOptionalDate(locatorDetails.customerExpiryDate),
+    locatorPlan: truncateStringNullable(locatorDetails.locatorPlan, 20),
     mapLink: payload.mapLink || "",
-    coordinates: payload.coordinates || "",
+    coordinates: truncateStringNullable(payload.coordinates, 30),
     createdBy: String(creatorId),
     status: payload.status || "New Lead",
-    implementationType: payload.implementationType || "",
+    implementationType: truncateString(payload.implementationType || "", 25),
     salesPerson: String(salesPersonId),
     requestedPerson: String(requestedPersonId),
     issueDescription: payload.comment || "",
-    amount: payload.projectValue || "",
+    amount: parseAmountToIntString(payload.projectValue),
     priceDetails: payload.priceDetails || "",
     accessories: payload.accessories || "",
     newQty: (payload.newQty || 0) + (payload.migrateQty || 0) + (payload.tradingQty || 0) + (payload.serviceQty || 0) + (payload.otherQty || 0),
@@ -395,28 +515,32 @@ export async function createServiceTicket(body: any, authUser: AuthUser) {
     throw Object.assign(new Error("Missing required service request fields: Requested Person."), { statusCode: 400 });
   }
 
+  const locatorDetails = await getLocatorDetailsForCustomer(payload.customerName || "", Number((payload as any).customerId || 0));
+  const customerDetails = await getCustomerLookupDetails(payload.customerName || "", Number((payload as any).customerId || 0));
   const nextId = await getNextId("tbl_customer_services_beta", "customer_service_id");
-  const creatorId = await resolveUserIdByName(userName || "guest");
-  const requestedPersonId = await resolveUserIdByName(reqPerson || salesPerson);
-  const salesPersonId = await resolveUserIdByName(salesPerson);
+  const creatorId = await resolveUserIdByName(String(userName || "guest"));
+  const requestedPersonId = await resolveUserIdByName(String(reqPerson || salesPerson));
+  const salesPersonId = await resolveUserIdByName(String(salesPerson));
   const [result]: any = await db.insert(serviceRequests).values({
     id: nextId,
     customerId: (payload as any).customerId || 0,
-    customerName: payload.customerName || "",
-    contactName: (payload as any).contactName || "",
-    phone: (payload as any).phone || "",
-    email: (payload as any).email || "",
-    address: (payload as any).address || "",
+    customerName: truncateString(payload.customerName || "", 100),
+    contactName: truncateStringNullable((payload as any).contactName, 50),
+    phone: truncateStringNullable((payload as any).phone || customerDetails.phone, 20),
+    email: truncateStringNullable((payload as any).email || customerDetails.email, 500),
+    address: truncateStringNullable((payload as any).address, 200),
+    customerExpiryDate: parseOptionalDate(locatorDetails.customerExpiryDate),
+    locatorPlan: truncateStringNullable(locatorDetails.locatorPlan, 20),
     mapLink: (payload as any).mapLink || "",
     accessories: (payload as any).accessories || "",
     issueDescription: payload.description || "",
     status: payload.status || "Pending",
     newQty: payload.quantity || 1,
     requestedPerson: String(requestedPersonId),
-    paymentStatus: payload.payment || "",
-    amount: payload.amount || "",
+    paymentStatus: parsePaymentStatus(payload.payment),
+    amount: parseAmountToIntString(payload.amount),
     salesPerson: String(salesPersonId),
-    region: payload.location || payload.region || "",
+    region: truncateStringNullable(payload.location || payload.region || "", 20),
     createdAt: new Date().toISOString().substring(0, 10),
     createdBy: String(creatorId),
     jobCreated: 0,
@@ -430,25 +554,28 @@ export async function updateLeadRegistration(recordId: number, body: any) {
   payload.region = normalizeLocationName(payload.region);
   const custName = payload.customerName;
 
-  const creatorId = await resolveUserIdByName(payload.source);
-  const salesPersonId = await resolveUserIdByName(payload.salesPerson);
-  const requestedPersonId = await resolveUserIdByName(payload.requestedPerson);
+  const locatorDetails = await getLocatorDetailsForCustomer(String(custName || ""), Number((body as any).customerId || 0));
+  const creatorId = await resolveUserIdByName(String(payload.source || ""));
+  const salesPersonId = await resolveUserIdByName(String(payload.salesPerson || ""));
+  const requestedPersonId = await resolveUserIdByName(String(payload.requestedPerson || ""));
   await db.update(serviceRequests).set({
-    customerName: custName,
-    contactName: payload.contactName,
-    phone: payload.phone,
-    email: payload.email,
-    region: payload.region,
-    address: payload.address,
+    customerName: truncateString(custName || "", 100),
+    contactName: truncateStringNullable(payload.contactName, 50),
+    phone: truncateStringNullable(payload.phone, 20),
+    email: truncateStringNullable(payload.email, 500),
+    region: truncateStringNullable(payload.region, 20),
+    address: truncateStringNullable(payload.address, 200),
+    customerExpiryDate: parseOptionalDate(locatorDetails.customerExpiryDate),
+    locatorPlan: truncateStringNullable(locatorDetails.locatorPlan, 20),
     mapLink: payload.mapLink,
-    coordinates: payload.coordinates,
+    coordinates: truncateStringNullable(payload.coordinates, 30),
     createdBy: String(creatorId),
     status: payload.status,
-    implementationType: payload.implementationType,
+    implementationType: truncateString(payload.implementationType || "", 25),
     salesPerson: String(salesPersonId),
     requestedPerson: String(requestedPersonId),
     issueDescription: payload.comment,
-    amount: payload.projectValue,
+    amount: parseAmountToIntString(payload.projectValue),
     priceDetails: payload.priceDetails,
     accessories: payload.accessories,
     newQty: (payload.newQty || 0) + (payload.migrateQty || 0) + (payload.tradingQty || 0) + (payload.serviceQty || 0) + (payload.otherQty || 0),
@@ -474,18 +601,21 @@ export async function updateServiceTicket(recordId: number, body: any) {
   const payload = normalizeServiceTicketPayload(body);
   payload.location = normalizeLocationName(payload.location);
   payload.region = normalizeLocationName(payload.region);
-  const requestedPersonId = await resolveUserIdByName(payload.requestedPerson);
-  const salesPersonId = await resolveUserIdByName(payload.assignee);
+  const locatorDetails = await getLocatorDetailsForCustomer(String(payload.customerName || ""), Number((body as any).customerId || 0));
+  const requestedPersonId = await resolveUserIdByName(String(payload.requestedPerson || ""));
+  const salesPersonId = await resolveUserIdByName(String(payload.assignee || ""));
   await db.update(serviceRequests).set({
-    customerName: payload.customerName,
+    customerName: truncateString(payload.customerName || "", 100),
     issueDescription: payload.description,
     status: payload.status,
     newQty: payload.quantity,
     requestedPerson: String(requestedPersonId),
-    paymentStatus: payload.payment,
-    amount: payload.amount,
+    paymentStatus: parsePaymentStatus(payload.payment),
+    amount: parseAmountToIntString(payload.amount),
+    customerExpiryDate: parseOptionalDate(locatorDetails.customerExpiryDate),
+    locatorPlan: truncateStringNullable(locatorDetails.locatorPlan, 20),
     salesPerson: String(salesPersonId),
-    region: payload.location || payload.region
+    region: truncateStringNullable(payload.location || payload.region || "", 20)
   }).where(eq(serviceRequests.id, recordId));
 }
 

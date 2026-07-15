@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { eq, like, or } from "drizzle-orm";
-import { db, getNextId } from "../db";
+import { db, getNextId, resolveUserIdByName } from "../db";
 import { customers, serviceRequests } from "../db/schema";
 import type { AuthUser } from "../auth/users";
 import { SaveRecordSchema } from "../shared/validation/saveRecord";
@@ -8,6 +8,8 @@ import { saveLocalSalesplusEntry } from "../services/salesplusService";
 import { syncRegistrationCustomer } from "../services/customerService";
 import {
   saveForcedServiceRequestFields,
+  getCustomerLookupDetails,
+  getLocatorDetailsForCustomer,
   type ForcedServiceRequestFields,
   type ForcedServiceRequestResult,
 } from "../services/serviceRequestService";
@@ -238,6 +240,7 @@ export async function saveForcedServiceRequestFromMessage(
     } else {
       const currentMissing = getMissingForcedServiceFields(pendingDraft.fields, authUser);
       const updatedFields = applyForcedServiceFollowUp(input, pendingDraft.fields, currentMissing);
+      await populatePhoneFromCustomerDb(updatedFields);
       const nextMissing = getMissingForcedServiceFields(updatedFields, authUser);
       if (nextMissing.length > 0) {
         pendingForcedServiceDrafts.set(chatChannel, { fields: updatedFields, createdAt: Date.now() });
@@ -267,6 +270,7 @@ export async function saveForcedServiceRequestFromMessage(
 
   const parsed = parseForcedServiceRequest(input);
   if (!parsed) return null;
+  await populatePhoneFromCustomerDb(parsed);
   const missingFields = getMissingForcedServiceFields(parsed, authUser);
   if (missingFields.length > 0) {
     pendingForcedServiceDrafts.set(chatChannel, { fields: parsed, createdAt: Date.now() });
@@ -291,7 +295,50 @@ export async function saveForcedServiceRequestFromMessage(
   return result;
 }
 
-export async function handleAIRecordSave(reply: string, userRole: string = "guest", userName: string = ""): Promise<{ reply: string; savedRecord?: any }> {
+async function populatePhoneFromCustomerDb(fields: ForcedServiceRequestFields) {
+  if (fields.customerName && fields.customerName !== "Unknown") {
+    try {
+      const details = await getCustomerLookupDetails(fields.customerName);
+      if (details && details.phone && (!fields.phone || isMissingPerson(fields.phone))) {
+        fields.phone = details.phone;
+      }
+    } catch (e) {
+      console.warn("[recordSaveHandler] Failed to pre-populate customer phone details:", e);
+    }
+  }
+}
+
+function parseOptionalDate(value: string | undefined): Date | null | undefined {
+  if (!value) return undefined;
+  const trimmed = String(value).trim();
+  if (!trimmed) return undefined;
+  const parsed = new Date(trimmed);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function parseAmountToIntString(val: any): string | null {
+  if (val === null || val === undefined) return null;
+  const strVal = String(val).trim();
+  if (!strVal || /^(not specified|na|n\/a|none|null|-)$/i.test(strVal)) return null;
+  const match = strVal.match(/[-+]?[0-9]+/);
+  if (match) {
+    const num = parseInt(match[0], 10);
+    return isNaN(num) ? null : String(num);
+  }
+  return null;
+}
+
+function truncateString(val: any, maxLen: number, fallback = ""): string {
+  if (val === null || val === undefined) return fallback;
+  return String(val).substring(0, maxLen);
+}
+
+function truncateStringNullable(val: any, maxLen: number): string | null {
+  if (val === null || val === undefined || String(val).trim() === "") return null;
+  return String(val).substring(0, maxLen);
+}
+
+export async function handleAIRecordSave(reply: string, userRole: string = "staff", userName: string = ""): Promise<{ reply: string; savedRecord?: any }> {
   const deleteMatch = findRecordTrigger(reply, "DELETE_RECORD");
   if (deleteMatch) {
     try {
@@ -330,12 +377,6 @@ export async function handleAIRecordSave(reply: string, userRole: string = "gues
   const updateMatch = findRecordTrigger(reply, "UPDATE_RECORD");
   if (updateMatch) {
     try {
-      if (userRole === "guest") {
-        return {
-          reply: removeRecordTrigger(reply, updateMatch) + "\n\n(Authorization Warning: Access Denied. Public guest users cannot update records.)",
-        };
-      }
-
       const rawJson = extractRecordTriggerJson(updateMatch.body);
       const record = JSON.parse(rawJson);
       const id = parseInt(record.id);
@@ -361,15 +402,15 @@ export async function handleAIRecordSave(reply: string, userRole: string = "gues
             reply: removeRecordTrigger(reply, updateMatch) + "\n\n(Authorization Warning: Access Denied. Only system administrators or staff can edit customer accounts.)",
           };
         }
-        const mappedCustomer: any = {};
-        if (record.data.name || record.data.customer_name) mappedCustomer.name = record.data.name || record.data.customer_name;
-        if (record.data.contactName || record.data.contact_name) mappedCustomer.contactName = record.data.contactName || record.data.contact_name;
-        if (record.data.phone) mappedCustomer.phone = record.data.phone;
-        if (record.data.email) mappedCustomer.email = record.data.email;
-        if (record.data.region) mappedCustomer.region = record.data.region;
-        if (record.data.implementationType || record.data.implementation_type) mappedCustomer.implementationType = record.data.implementationType || record.data.implementation_type;
-        if (record.data.vehicleCount !== undefined || record.data.vehicle_count !== undefined) mappedCustomer.vehicleCount = record.data.vehicleCount !== undefined ? record.data.vehicleCount : record.data.vehicle_count;
-
+        const mappedCustomer = {
+          name: record.data.name,
+          contactName: record.data.contactName,
+          phone: record.data.phone,
+          email: record.data.email,
+          region: record.data.region,
+          implementationType: record.data.implementationType,
+          address: record.data.address,
+        };
         await db.update(customers).set(mappedCustomer).where(eq(customers.id, id));
         return {
           reply: removeRecordTrigger(reply, updateMatch) + `\n\n(CRM: Customer account #${id} updated successfully.)`,
@@ -403,10 +444,11 @@ export async function handleAIRecordSave(reply: string, userRole: string = "gues
       normalizeMappedContactAndCustomer(mapped);
       
       // Verify if customer exists in the database
+      let exactMatch: any = null;
       if (mapped.customerName) {
         const inputName = mapped.customerName.trim();
         let matchedCustomers = await db
-          .select({ id: customers.id, name: customers.name })
+          .select()
           .from(customers)
           .where(like(customers.name, `%${inputName}%`));
 
@@ -415,7 +457,7 @@ export async function handleAIRecordSave(reply: string, userRole: string = "gues
           if (words.length > 0) {
             const conditions = words.map(w => like(customers.name, `%${w}%`));
             matchedCustomers = await db
-              .select({ id: customers.id, name: customers.name })
+              .select()
               .from(customers)
               .where(or(...conditions))
               .limit(5);
@@ -428,7 +470,7 @@ export async function handleAIRecordSave(reply: string, userRole: string = "gues
           };
         }
 
-        const exactMatch = matchedCustomers.find(
+        exactMatch = matchedCustomers.find(
           (c) => (c.name || "").trim().toLowerCase() === inputName.toLowerCase()
         );
 
@@ -444,8 +486,26 @@ export async function handleAIRecordSave(reply: string, userRole: string = "gues
           };
         } else {
           mapped.customerName = exactMatch.name;
+          mapped.customerId = exactMatch.id;
         }
       }
+
+      const customerId = exactMatch ? exactMatch.id : 0;
+      const customerName = exactMatch ? exactMatch.name : (mapped.customerName || "Unknown");
+      const locatorDetails = await getLocatorDetailsForCustomer(customerName, customerId);
+      const customerDetails = await getCustomerLookupDetails(customerName, customerId);
+
+      let finalRegion = mapped.region || mapped.location || "";
+      let mapLink = "";
+      if (mapped.location && (mapped.location.startsWith("http") || mapped.location.includes("maps."))) {
+        mapLink = mapped.location;
+        finalRegion = customerDetails.region || exactMatch?.region || "Dubai";
+      }
+
+      const contactPhone = mapped.phone || customerDetails.phone || exactMatch?.phone || "";
+      const finalDescription = contactPhone 
+        ? `${mapped.issueDescription || mapped.description || ""} (Contact: ${contactPhone})` 
+        : (mapped.issueDescription || mapped.description || "");
 
       const requestedPerson = applyRequiredRequestedPerson(mapped, userRole, userName);
       if (!requestedPerson) {
@@ -454,19 +514,32 @@ export async function handleAIRecordSave(reply: string, userRole: string = "gues
         };
       }
 
+      const creatorId = await resolveUserIdByName(String(userName || "guest"));
+      const requestedPersonId = await resolveUserIdByName(String(requestedPerson));
+      const salesPersonId = await resolveUserIdByName(String(mapped.salesPerson || requestedPerson));
+
       const nextId = await getNextId("tbl_customer_services_beta", "customer_service_id");
       const [res]: any = await db.insert(serviceRequests).values({
         id: nextId,
-        customerId: mapped.customerId || 0,
-        customerName: mapped.customerName || "Unknown",
-        issueDescription: mapped.issueDescription || "",
+        customerId: customerId,
+        createdAt: new Date().toISOString().substring(0, 10),
+        createdBy: String(creatorId),
+        region: truncateStringNullable(finalRegion, 20),
         status: mapped.status || "New",
-        newQty: mapped.newQty || 1,
-        requestedPerson: mapped.requestedPerson || "",
-        paymentStatus: mapped.paymentStatus || "",
-        amount: mapped.amount || "",
-        salesPerson: mapped.salesPerson || "",
-        createdBy: userName || "guest",
+        implementationType: truncateString(mapped.implementationType || "", 25),
+        customerName: truncateString(customerName, 100),
+        contactName: truncateStringNullable(mapped.contactName || customerDetails.contactName || exactMatch?.contactName || "", 50),
+        phone: truncateStringNullable(contactPhone, 20),
+        email: truncateStringNullable(mapped.email || customerDetails.email || exactMatch?.email || "", 500),
+        customerExpiryDate: parseOptionalDate(locatorDetails.customerExpiryDate),
+        locatorPlan: truncateStringNullable(locatorDetails.locatorPlan, 20),
+        mapLink,
+        newQty: mapped.newQty || mapped.quantity || 1,
+        requestedPerson: String(requestedPersonId),
+        paymentStatus: (mapped.paymentStatus && mapped.paymentStatus.trim().toLowerCase() === "paid") ? "paid" : "notpaid",
+        amount: parseAmountToIntString(mapped.amount),
+        salesPerson: String(salesPersonId),
+        issueDescription: finalDescription,
       });
       return {
         reply: cleanVisibleSavedRecordReply(removeRecordTrigger(reply, saveMatch)) + `\n\n(CRM: Service ticket ${ticketId} created successfully.)`,

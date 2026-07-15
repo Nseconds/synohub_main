@@ -342,11 +342,16 @@ export default function App() {
           details: "Could not reach database API endpoint." 
         });
       }
-      // Populate with empty datasets if database fetch fails
-      setData({
-        registrations: [],
-        services: [],
-        customers: []
+      // Keep existing data on transient background errors instead of wiping the UI
+      setData(prev => {
+        if (prev.registrations.length > 0 || prev.services.length > 0 || prev.customers.length > 0) {
+          return prev;
+        }
+        return {
+          registrations: [],
+          services: [],
+          customers: []
+        };
       });
     } finally {
       setLoading(false);

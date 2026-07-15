@@ -1,7 +1,7 @@
 import { db } from "../db";
 import { customers, customersLocator, serviceRequests, users } from "../db/schema";
 import { normalizeUserName, type AuthUser } from "../auth/users";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 export async function getDashboardData(authUser: AuthUser) {
   const userRole = authUser.role;
@@ -11,7 +11,7 @@ export async function getDashboardData(authUser: AuthUser) {
     .select({
       id: customers.id,
       name: customers.name,
-      traccarId: customers.traccarId,
+      traccarId: customersLocator.customerTraccarId,
       contactName: customers.contactName,
       phone: customers.phone,
       email: customers.email,
@@ -19,7 +19,7 @@ export async function getDashboardData(authUser: AuthUser) {
       implementationType: customers.implementationType,
       vehicleCount: customers.vehicleCount,
       createdBy: customers.createdBy,
-      address: customers.address,
+      address: sql<string | null>`NULL`,
       customerUsername: customersLocator.customerUsername,
       locatorPlan: customersLocator.locatorPlan,
     })
@@ -43,16 +43,7 @@ export async function getDashboardData(authUser: AuthUser) {
   };
 
   let filteredCustomers = allCustomers;
-  if (userRole === "guest") {
-    allRequests = allRequests.filter(r => {
-      const createdByVal = (r.createdBy || "").trim().toLowerCase();
-      return createdByVal === userName;
-    });
-    filteredCustomers = allCustomers.filter(c => {
-      const createdByVal = (c.createdBy || "").trim().toLowerCase();
-      return createdByVal === userName;
-    });
-  } else if (false && userRole === "staff" && userName) {
+  if (false && userRole === "staff" && userName) {
     allRequests = allRequests.filter(r => {
       const reqPerson = (r.requestedPerson || "").trim().toLowerCase();
       const salesPerson = (r.salesPerson || "").trim().toLowerCase();

@@ -1,4 +1,4 @@
-import { mysqlTable, varchar, serial, text, timestamp, int } from 'drizzle-orm/mysql-core';
+import { mysqlTable, varchar, serial, text, timestamp, int, date } from 'drizzle-orm/mysql-core';
 
 export const users = mysqlTable('tbl_users', {
   id: int('user_id').primaryKey(),
@@ -14,15 +14,13 @@ export const users = mysqlTable('tbl_users', {
 export const customers = mysqlTable('customers', {
   id: int('id').primaryKey(),
   name: varchar('name', { length: 200 }),
-  traccarId: int('traccarId'),
-  contactName: varchar('contactName', { length: 200 }),
+  contactName: varchar('contact_name', { length: 200 }),
   phone: varchar('phone', { length: 100 }),
   email: varchar('email', { length: 255 }),
   region: varchar('region', { length: 20 }),
-  implementationType: varchar('implementationType', { length: 100 }),
+  implementationType: varchar('implementation_type', { length: 100 }),
   vehicleCount: int('vehicle_count').default(0),
   createdBy: varchar('created_by', { length: 255 }).default(''),
-  address: text('address'),
 });
 
 export const serviceRequests = mysqlTable('tbl_customer_services_beta', {
@@ -38,6 +36,8 @@ export const serviceRequests = mysqlTable('tbl_customer_services_beta', {
   phone: varchar('customer_service_customer_phone', { length: 50 }),
   email: varchar('customer_service_customer_email', { length: 500 }),
   address: text('customer_service_customer_address'),
+  customerExpiryDate: date('customer_service_customer_exp_date'),
+  locatorPlan: varchar('locator_plan', { length: 20 }),
   mapLink: text('customer_service_address_map'),
   coordinates: varchar('customer_service_address_cordinates', { length: 100 }),
   

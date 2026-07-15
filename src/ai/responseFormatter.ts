@@ -1,4 +1,5 @@
-export type SafeQueryAiMode = "gemini";
+export type SafeQueryAiMode = "gemini" | "groq";
+
 
 export function getModeScopedChatChannel(channel: string, aiMode: SafeQueryAiMode): string {
   if (/^\d+$/.test(channel)) {

@@ -51,7 +51,7 @@ export function verifyToken(token: string | undefined): AuthUser | null {
   try {
     const parsed = JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8")) as AuthUser;
     if (!parsed.name || !parsed.role || !parsed.sub || !parsed.exp) return null;
-    if (!["admin", "staff", "guest"].includes(parsed.role)) return null;
+    if (!["admin", "staff"].includes(parsed.role)) return null;
     if (parsed.exp < Math.floor(Date.now() / 1000)) return null;
     return parsed;
   } catch {

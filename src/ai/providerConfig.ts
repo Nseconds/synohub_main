@@ -15,10 +15,17 @@ export const cleanedGeminiKey = rawGeminiKey;
 export const geminiModel = cleanEnvVar(env.GEMINI_MODEL) || "gemini-3.5-flash";
 export const cloudProviderLabel = "Gemini";
 
+export const rawGroqKey = cleanEnvVar(env.GROQ_API_KEY);
+export const cleanedGroqKey = rawGroqKey;
+export const groqModel = cleanEnvVar(env.GROQ_MODEL) || "llama-3.3-70b-versatile";
+
 console.log("--- Environment Variable Sync Check ---");
 console.log("GEMINI_API_KEY:", cleanedGeminiKey ? "PRESENT" : "MISSING");
 console.log("GEMINI_MODEL:", geminiModel);
+console.log("GROQ_API_KEY:", cleanedGroqKey ? "PRESENT" : "MISSING");
+console.log("GROQ_MODEL:", groqModel);
 console.log("---------------------------------------");
+
 
 export let genAI: any = null;
 if (cleanedGeminiKey) {

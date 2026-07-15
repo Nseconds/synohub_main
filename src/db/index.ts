@@ -11,6 +11,10 @@ const poolConfig: any = {
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 10000, // 10 seconds
+  maxIdle: 10,
+  idleTimeout: 60000, // 1 minute
 };
 
 let useSocket = false;

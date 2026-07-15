@@ -14,6 +14,8 @@ export const EnvSchema = z.object({
   AUTH_SECRET: optionalEnvString,
   GEMINI_API_KEY: optionalEnvString.default(""),
   GEMINI_MODEL: optionalEnvString.default("gemini-3.5-flash"),
+  GROQ_API_KEY: optionalEnvString.default(""),
+  GROQ_MODEL: optionalEnvString.default("llama-3.3-70b-versatile"),
   JWT_SECRET: optionalEnvString,
   PORT: z.preprocess((value) => {
     if (value === undefined || value === null || value === "") return 3000;
