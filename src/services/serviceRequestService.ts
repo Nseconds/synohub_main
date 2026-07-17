@@ -519,8 +519,8 @@ export async function createServiceTicket(body: any, authUser: AuthUser) {
   const customerDetails = await getCustomerLookupDetails(payload.customerName || "", Number((payload as any).customerId || 0));
   const nextId = await getNextId("tbl_customer_services_beta", "customer_service_id");
   const creatorId = await resolveUserIdByName(String(userName || "guest"));
-  const requestedPersonId = await resolveUserIdByName(String(reqPerson || salesPerson));
-  const salesPersonId = await resolveUserIdByName(String(salesPerson));
+  const requestedPersonId = await resolveUserIdByName(String(reqPerson));
+  const salesPersonId = requestedPersonId;
   const [result]: any = await db.insert(serviceRequests).values({
     id: nextId,
     customerId: (payload as any).customerId || 0,

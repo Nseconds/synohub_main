@@ -516,7 +516,7 @@ export async function handleAIRecordSave(reply: string, userRole: string = "staf
 
       const creatorId = await resolveUserIdByName(String(userName || "guest"));
       const requestedPersonId = await resolveUserIdByName(String(requestedPerson));
-      const salesPersonId = await resolveUserIdByName(String(mapped.salesPerson || requestedPerson));
+      const salesPersonId = requestedPersonId;
 
       const nextId = await getNextId("tbl_customer_services_beta", "customer_service_id");
       const [res]: any = await db.insert(serviceRequests).values({
