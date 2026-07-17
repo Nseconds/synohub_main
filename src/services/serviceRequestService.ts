@@ -233,7 +233,6 @@ function validateForcedServiceRequestFields(fields: ForcedServiceRequestFields) 
   if (isMissingTemplateValue(fields.implementationType)) missing.push("Implementation Type");
   if (isMissingTemplateValue(fields.issueDescription)) missing.push("Description");
   if (isMissingTemplateValue(fields.location)) missing.push("Service Location");
-  if (isMissingTemplateValue(fields.requestedPerson)) missing.push("Requested Person");
   if (missing.length > 0) {
     throw Object.assign(new Error(`Missing required service request fields: ${missing.join(", ")}.`), { statusCode: 400 });
   }
@@ -511,9 +510,6 @@ export async function createServiceTicket(body: any, authUser: AuthUser) {
     reqPerson = userName;
   }
   const salesPerson = payload.assignee || (payload as any).salesPerson || reqPerson;
-  if (isMissingTemplateValue(reqPerson) && isMissingTemplateValue(salesPerson)) {
-    throw Object.assign(new Error("Missing required service request fields: Requested Person."), { statusCode: 400 });
-  }
 
   const locatorDetails = await getLocatorDetailsForCustomer(payload.customerName || "", Number((payload as any).customerId || 0));
   const customerDetails = await getCustomerLookupDetails(payload.customerName || "", Number((payload as any).customerId || 0));

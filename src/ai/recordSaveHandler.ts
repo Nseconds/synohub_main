@@ -69,7 +69,7 @@ function mapInputToSchema(input: any): any {
   return schema;
 }
 
-function applyRequiredRequestedPerson(mapped: any, userRole: string, userName: string): string | null {
+function applyRequiredRequestedPerson(mapped: any, userRole: string, userName: string): string {
   let resolvedPerson = String(mapped.requestedPerson || "").trim();
   if (!resolvedPerson && userName) {
     resolvedPerson = userName.trim();
@@ -77,8 +77,6 @@ function applyRequiredRequestedPerson(mapped: any, userRole: string, userName: s
   if (!resolvedPerson) {
     resolvedPerson = String(mapped.salesPerson || "").trim();
   }
-
-  if (!resolvedPerson) return null;
 
   mapped.requestedPerson = resolvedPerson;
   if (!String(mapped.salesPerson || "").trim()) {
@@ -153,7 +151,6 @@ function getMissingForcedServiceFields(fields: ForcedServiceRequestFields, authU
   if (!fields.implementationType || isMissingPerson(fields.implementationType)) missing.push("Implementation Type");
   if (!fields.issueDescription || isMissingPerson(fields.issueDescription)) missing.push("Description");
   if (!fields.location || isMissingPerson(fields.location)) missing.push("Service Location");
-  if (authUser.role !== "staff" && authUser.role !== "admin" && isMissingPerson(fields.requestedPerson)) missing.push("Requested Person");
   return missing;
 }
 
@@ -508,11 +505,6 @@ export async function handleAIRecordSave(reply: string, userRole: string = "staf
         : (mapped.issueDescription || mapped.description || "");
 
       const requestedPerson = applyRequiredRequestedPerson(mapped, userRole, userName);
-      if (!requestedPerson) {
-        return {
-          reply: cleanVisibleSavedRecordReply(removeRecordTrigger(reply, saveMatch)) + "\n\nMissing required field: Requested Person. Please tell me who requested this ticket before I save it.",
-        };
-      }
 
       const creatorId = await resolveUserIdByName(String(userName || "guest"));
       const requestedPersonId = await resolveUserIdByName(String(requestedPerson));

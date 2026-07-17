@@ -339,8 +339,8 @@ export const LeadFormPage = ({
                 <input type="text" placeholder="Accessories" value={leadForm.accessories || ""} onChange={e => updateLeadForm({ accessories: e.target.value })} className={`w-full bg-[#F1F5F9] border border-[#E2E8F0] rounded px-3 py-1.5 text-[11px] text-zinc-600 focus:outline-none ${isExisting ? "" : "h-8"}`} />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] text-zinc-500 flex items-center gap-0.5">Requested Person: <span className="text-red-500">*</span></label>
-                <select required value={leadForm.requestedPerson} onChange={e => updateLeadForm({ requestedPerson: e.target.value })} className={`w-full ${quantityBg} border border-[#E2E8F0] rounded px-3 py-1.5 text-[11px] text-zinc-600 focus:outline-none ${isExisting ? "" : "h-8"}`}>
+                <label className="text-[10px] text-zinc-500 flex items-center gap-0.5">Requested Person:</label>
+                <select value={leadForm.requestedPerson} onChange={e => updateLeadForm({ requestedPerson: e.target.value })} className={`w-full ${quantityBg} border border-[#E2E8F0] rounded px-3 py-1.5 text-[11px] text-zinc-600 focus:outline-none ${isExisting ? "" : "h-8"}`}>
                   <option value="">Select requested person</option>
                   {requestedPeopleList.map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
