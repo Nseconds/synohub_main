@@ -10,8 +10,13 @@ function normalizeBcryptHash(hash: string) {
 }
 
 function roleFromUserType(userType: string) {
-  return "admin" as const;
+  const normalized = (userType || "").trim().toLowerCase();
+  if (normalized === "admin" || normalized === "administrator") {
+    return "admin" as const;
+  }
+  return "staff" as const;
 }
+
 
 export function registerAuthRoutes(app: Express) {
   app.post("/api/login", async (req, res) => {
