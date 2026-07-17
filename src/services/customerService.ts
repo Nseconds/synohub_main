@@ -41,11 +41,7 @@ export async function syncRegistrationCustomer(input: any, userName: string, def
   }
 
   const currentCount = existing[0].vehicleCount || 0;
-  const vehicleCount = currentCount + totalQty;
-  await db.update(customers)
-    .set({ vehicleCount })
-    .where(eq(customers.name, customerName));
-  return { action: "updated", customerName, vehicleCount };
+  return { action: "updated", customerName, vehicleCount: currentCount };
 }
 
 export async function syncLeadEditCustomer(input: any): Promise<CustomerSyncResult> {
@@ -77,7 +73,6 @@ export async function syncLeadEditCustomer(input: any): Promise<CustomerSyncResu
     return { action: "created", customerName, vehicleCount };
   }
 
-  const vehicleCount = totalQty > 0 ? totalQty : existing[0].vehicleCount;
   await db.update(customers)
     .set({
       contactName: input.contactName || input.contact_name || existing[0].contactName,
@@ -85,8 +80,7 @@ export async function syncLeadEditCustomer(input: any): Promise<CustomerSyncResu
       email: input.email || existing[0].email,
       region: input.region || existing[0].region,
       implementationType: input.implementationType || input.implementation_type || existing[0].implementationType,
-      vehicleCount,
     })
     .where(eq(customers.name, customerName));
-  return { action: "updated", customerName, vehicleCount };
+  return { action: "updated", customerName, vehicleCount: existing[0].vehicleCount };
 }
