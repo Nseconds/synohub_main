@@ -45,7 +45,7 @@ export const serviceRequests = mysqlTable('tbl_customer_services_beta', {
   accessories: text('schedule_note'),
   
   requestedPerson: varchar('requested_by', { length: 100 }),
-  salesPerson: varchar('customer_service_L1_assigned_to', { length: 100 }),
+  salesPerson: varchar('customer_service_L1_assigned_to', { length: 100 }).default('0'),
   
   amount: varchar('customer_service_amount', { length: 50 }),
   priceDetails: text('customer_service_payment'),
